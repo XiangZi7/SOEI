@@ -10,6 +10,7 @@ fn main() {
             "player_command",
             "scene_track",
             "lyrics_import",
+            "settings_open",
             "settings_load",
             "settings_save",
             "display_list",

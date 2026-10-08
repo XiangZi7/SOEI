@@ -6,24 +6,24 @@ import ImmersiveScene from '../visual/ImmersiveScene.vue'
 import SceneModePicker from '../visual/SceneModePicker.vue'
 
 defineProps<{ testLoading?: boolean }>()
-defineEmits<{ test: []; preview: [] }>()
-const { preferences } = storeToRefs(useMusicStore())
+defineEmits<{ test: []; preview: [preview: boolean] }>()
+const { preferences, activeTrack } = storeToRefs(useMusicStore())
 </script>
 
 <template>
   <section
     class="mb-10 overflow-hidden rounded-2xl border border-line bg-stage"
-    aria-label="歌词舞台预览"
+    :aria-label="activeTrack ? '当前歌曲的歌词舞台' : '歌词舞台预览'"
   >
     <div class="relative h-100 overflow-hidden max-sm:h-90">
       <ImmersiveScene
-        preview
+        :preview="!activeTrack"
         showcase
       />
       <UiButton
         variant="ghost"
         class="absolute top-7 right-[5%] gap-2 rounded-full border border-line bg-stage/50 px-4 text-label text-stage-muted backdrop-blur-md hover:text-ink max-sm:top-6"
-        @click="$emit('preview')"
+        @click="$emit('preview', !activeTrack)"
         ><span>进入舞台</span
         ><AppIcon
           name="arrow-up-right"

@@ -6,7 +6,7 @@ use crate::{
     AppState,
 };
 use std::sync::atomic::Ordering;
-use tauri::{AppHandle, Manager, State, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 fn main_only(window: &WebviewWindow) -> AppResult<()> {
     if window.label() != "main" {
@@ -14,9 +14,61 @@ fn main_only(window: &WebviewWindow) -> AppResult<()> {
     }
     Ok(())
 }
+fn control_window(window: &WebviewWindow) -> AppResult<()> {
+    if !matches!(window.label(), "main" | "settings") {
+        return Err(AppError::new("PERMISSION", "此窗口只允许读取播放场景"));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn settings_open(
+    window: WebviewWindow,
+    app: AppHandle,
+    category: String,
+) -> AppResult<()> {
+    main_only(&window)?;
+    let category = match category.as_str() {
+        "general" | "playback" | "lyrics" | "visual" | "performance" | "shortcuts" | "about" => {
+            category
+        }
+        _ => "general".to_string(),
+    };
+    if let Some(settings) = app.get_webview_window("settings") {
+        settings
+            .emit("ui:settings-category", &category)
+            .map_err(|error| AppError::new("WINDOW", error))?;
+        settings
+            .show()
+            .map_err(|error| AppError::new("WINDOW", error))?;
+        settings
+            .unminimize()
+            .map_err(|error| AppError::new("WINDOW", error))?;
+        return settings
+            .set_focus()
+            .map_err(|error| AppError::new("WINDOW", error));
+    }
+    WebviewWindowBuilder::new(
+        &app,
+        "settings",
+        WebviewUrl::App(format!("index.html?settings&category={category}").into()),
+    )
+    .title("SOEI · Settings")
+    .decorations(false)
+    .inner_size(860.0, 660.0)
+    .min_inner_size(640.0, 520.0)
+    .resizable(true)
+    .parent(&window)
+    .map_err(|error| AppError::new("WINDOW", error))?
+    .center()
+    .build()
+    .map_err(|error| AppError::new("WINDOW", error))?;
+    Ok(())
+}
+
 #[tauri::command]
 pub fn library_load(window: WebviewWindow, state: State<AppState>) -> AppResult<Vec<Track>> {
-    main_only(&window)?;
+    control_window(&window)?;
     state.storage.tracks()
 }
 #[tauri::command]
@@ -122,7 +174,7 @@ pub async fn player_command(
     mode: Option<String>,
     queue: Option<Vec<String>>,
 ) -> AppResult<PlaybackSnapshot> {
-    main_only(&window)?;
+    control_window(&window)?;
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
         let operation = match action.as_str() {
@@ -174,7 +226,7 @@ pub async fn lyrics_import(
     app: AppHandle,
     id: String,
 ) -> AppResult<Option<String>> {
-    main_only(&window)?;
+    control_window(&window)?;
     tauri::async_runtime::spawn_blocking(move || {
         let Some(path) = rfd::FileDialog::new()
             .set_title("选择 LRC 歌词")
@@ -188,6 +240,7 @@ pub async fn lyrics_import(
         track.lyric_ref = Some(path.canonicalize()?.to_string_lossy().into_owned());
         let text = library::read_lyrics(&track)?;
         state.storage.save_track(&track)?;
+        let _ = app.emit("library:track", &track);
         Ok(text)
     })
     .await
@@ -203,15 +256,14 @@ pub fn settings_save(
     app: AppHandle,
     value: serde_json::Value,
 ) -> AppResult<()> {
-    main_only(&window)?;
+    control_window(&window)?;
     app.state::<AppState>().storage.save_settings(&value)?;
-    use tauri::Emitter;
     let _ = app.emit("settings:changed", &value);
     Ok(())
 }
 #[tauri::command]
 pub fn display_list(window: WebviewWindow, app: AppHandle) -> AppResult<Vec<Display>> {
-    main_only(&window)?;
+    control_window(&window)?;
     wallpaper::displays(&app)
 }
 #[tauri::command]
@@ -220,7 +272,7 @@ pub async fn wallpaper_set_enabled(
     app: AppHandle,
     ids: Vec<String>,
 ) -> AppResult<WallpaperStatus> {
-    main_only(&window)?;
+    control_window(&window)?;
     tauri::async_runtime::spawn_blocking(move || wallpaper::enable(&app, ids))
         .await
         .map_err(|error| AppError::new("WALLPAPER", error))?
@@ -231,7 +283,7 @@ pub fn wallpaper_status(state: State<AppState>) -> AppResult<WallpaperStatus> {
 }
 #[tauri::command]
 pub async fn visual_import(window: WebviewWindow, app: AppHandle) -> AppResult<Option<String>> {
-    main_only(&window)?;
+    control_window(&window)?;
     tauri::async_runtime::spawn_blocking(move || {
         let Some(path) = rfd::FileDialog::new()
             .set_title("选择场景背景")
@@ -250,8 +302,14 @@ pub async fn visual_import(window: WebviewWindow, app: AppHandle) -> AppResult<O
     .map_err(|error| AppError::new("BACKGROUND", error))?
 }
 #[tauri::command]
-pub fn window_action(window: WebviewWindow, action: String) -> AppResult<()> {
-    main_only(&window)?;
+pub fn window_action(window: WebviewWindow, app: AppHandle, action: String) -> AppResult<()> {
+    control_window(&window)?;
+    let window = if window.label() == "settings" && action == "borderless" {
+        app.get_webview_window("main")
+            .ok_or_else(|| AppError::new("WINDOW", "主窗口不存在"))?
+    } else {
+        window
+    };
     match action.as_str() {
         "minimize" => window.minimize(),
         "maximize" => {
@@ -276,7 +334,7 @@ pub async fn shortcuts_set(
     app: AppHandle,
     bindings: std::collections::HashMap<String, String>,
 ) -> AppResult<()> {
-    main_only(&window)?;
+    control_window(&window)?;
     tauri::async_runtime::spawn_blocking(move || {
         use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
         let mut parsed = Vec::new();

@@ -52,7 +52,12 @@ const { enter, leave, cancel } = useLyricTransitions(() => ({
         : 'inset-x-[10%] top-[23%] bottom-[26%] max-sm:inset-x-[7%] max-sm:top-[24%] max-sm:bottom-[30%]'
     "
   >
-    <template v-if="lines.length && (current || layout === 'readable')">
+    <template
+      v-if="
+        layout === 'title' ||
+        (lines.length && (current || layout === 'readable'))
+      "
+    >
       <p
         v-if="kinetic"
         class="absolute left-[3%] max-w-[88%] -rotate-3 font-display tracking-wider wrap-anywhere text-stage-muted/25"
@@ -100,7 +105,7 @@ const { enter, leave, cancel } = useLyricTransitions(() => ({
               <p
                 class="mb-4.5 text-caption tracking-[.24em] text-stage-muted max-sm:hidden"
               >
-                此刻正在听
+                {{ track?.demo ? '视觉预览' : '此刻正在听' }}
               </p>
               <h1
                 class="font-display leading-tight font-normal wrap-anywhere"
@@ -116,6 +121,7 @@ const { enter, leave, cancel } = useLyricTransitions(() => ({
                 {{ track?.artist }}
               </p>
               <p
+                v-if="current"
                 class="font-display leading-relaxed wrap-anywhere text-stage-gold"
                 :class="
                   showcase
@@ -185,7 +191,12 @@ const { enter, leave, cancel } = useLyricTransitions(() => ({
     >
       <div
         v-if="track"
-        class="aspect-square w-[min(30vw,330px)] shrink-0 overflow-hidden rounded-lg shadow-panel max-sm:w-[min(38vw,170px)]"
+        class="aspect-square shrink-0 overflow-hidden rounded-lg shadow-panel"
+        :class="
+          showcase
+            ? 'w-40 max-sm:w-24'
+            : 'w-[min(30vw,330px)] max-sm:w-[min(38vw,170px)]'
+        "
       >
         <Artwork
           :artwork="track.artwork"
@@ -195,10 +206,21 @@ const { enter, leave, cancel } = useLyricTransitions(() => ({
       </div>
       <div class="max-w-140 min-w-0">
         <p class="mb-4.5 text-caption tracking-[.24em] text-stage-muted">
-          {{ lines.length ? '前奏 · 故事即将开始' : '让音乐慢慢发生' }}
+          {{
+            track?.demo
+              ? '视觉预览'
+              : lines.length
+                ? '前奏 · 故事即将开始'
+                : '此刻正在听'
+          }}
         </p>
         <h1
-          class="font-display text-[clamp(28px,4vw,62px)] leading-tight font-normal wrap-anywhere max-sm:text-[26px]"
+          class="font-display leading-tight font-normal wrap-anywhere"
+          :class="
+            showcase
+              ? 'text-4xl max-sm:text-2xl'
+              : 'text-[clamp(28px,4vw,62px)] max-sm:text-[26px]'
+          "
         >
           {{ track?.title ?? '你的音乐，另一片风景' }}
         </h1>

@@ -256,9 +256,6 @@ fn enable_if_current(
                 .map_err(|error| AppError::new("WALLPAPER_WINDOW", error))?;
             created.push(label);
             window
-                .set_ignore_cursor_events(true)
-                .map_err(|error| AppError::new("WALLPAPER_INPUT", error))?;
-            window
                 .show()
                 .map_err(|error| AppError::new("WALLPAPER_WINDOW", error))?;
             attach(&window, monitor)?;
@@ -429,18 +426,59 @@ fn attach(window: &tauri::WebviewWindow, display: &Display) -> AppResult<()> {
 fn child_styles(style: isize, extended: isize) -> (isize, isize) {
     use windows_sys::Win32::UI::WindowsAndMessaging::*;
     (
-        (style & !((WS_POPUP | WS_OVERLAPPEDWINDOW) as isize)) | WS_CHILD as isize,
-        (extended & !((WS_EX_APPWINDOW | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE) as isize))
+        (style & !((WS_POPUP | WS_OVERLAPPEDWINDOW) as isize)) | (WS_CHILD | WS_DISABLED) as isize,
+        (extended
+            & !((WS_EX_APPWINDOW | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_LAYERED) as isize))
             | (WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW) as isize,
     )
 }
 
 #[cfg(windows)]
 fn attach_handle(handle: windows_sys::Win32::Foundation::HWND, display: &Display) -> AppResult<()> {
+    attach_child(handle, find_desktop_host()?, display)
+}
+
+#[cfg(windows)]
+fn set_window_style(
+    handle: windows_sys::Win32::Foundation::HWND,
+    index: windows_sys::Win32::UI::WindowsAndMessaging::WINDOW_LONG_PTR_INDEX,
+    value: isize,
+) -> AppResult<()> {
     use windows_sys::Win32::{
-        Foundation::POINT, Graphics::Gdi::MapWindowPoints, UI::WindowsAndMessaging::*,
+        Foundation::{GetLastError, SetLastError},
+        UI::WindowsAndMessaging::SetWindowLongPtrW,
     };
-    let host = find_desktop_host()?;
+    unsafe {
+        SetLastError(0);
+        let previous = SetWindowLongPtrW(handle, index, value);
+        let error = GetLastError();
+        if previous == 0 && error != 0 {
+            return Err(AppError::new(
+                "WALLPAPER_STYLE",
+                format!(
+                    "无法设置壁纸窗口样式：{}",
+                    std::io::Error::from_raw_os_error(error as i32)
+                ),
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn attach_child(
+    handle: windows_sys::Win32::Foundation::HWND,
+    host: windows_sys::Win32::Foundation::HWND,
+    display: &Display,
+) -> AppResult<()> {
+    use windows_sys::Win32::{
+        Foundation::POINT,
+        Graphics::Gdi::MapWindowPoints,
+        UI::{
+            Input::KeyboardAndMouse::{EnableWindow, IsWindowEnabled},
+            WindowsAndMessaging::*,
+        },
+    };
     unsafe {
         if IsWindow(handle) == 0 {
             return Err(AppError::new("WALLPAPER_HANDLE", "壁纸窗口已经关闭"));
@@ -449,11 +487,20 @@ fn attach_handle(handle: windows_sys::Win32::Foundation::HWND, display: &Display
             GetWindowLongPtrW(handle, GWL_STYLE),
             GetWindowLongPtrW(handle, GWL_EXSTYLE),
         );
-        SetWindowLongPtrW(handle, GWL_STYLE, style);
-        SetWindowLongPtrW(handle, GWL_EXSTYLE, extended);
+        set_window_style(handle, GWL_STYLE, style)?;
+        set_window_style(handle, GWL_EXSTYLE, extended)?;
+        // Tao 窗口类带 CS_OWNDC，不能使用 WS_EX_LAYERED。
+        // 禁用桌面子窗口的输入后，Windows 将鼠标消息交给桌面父窗口。
+        EnableWindow(handle, 0);
+        if IsWindowEnabled(handle) != 0 {
+            return Err(AppError::new("WALLPAPER_INPUT", "无法停用壁纸窗口输入"));
+        }
         SetParent(handle, host);
         if GetParent(handle) != host {
-            return Err(AppError::new("WALLPAPER_PARENT", "桌面窗口附着失败"));
+            return Err(AppError::new(
+                "WALLPAPER_PARENT",
+                format!("桌面窗口附着失败：{}", std::io::Error::last_os_error()),
+            ));
         }
         let mut origin = POINT {
             x: display.x,
@@ -470,7 +517,10 @@ fn attach_handle(handle: windows_sys::Win32::Foundation::HWND, display: &Display
             SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW,
         ) == 0
         {
-            return Err(AppError::new("WALLPAPER_SIZE", "无法调整壁纸窗口"));
+            return Err(AppError::new(
+                "WALLPAPER_SIZE",
+                format!("无法调整壁纸窗口：{}", std::io::Error::last_os_error()),
+            ));
         }
     }
     Ok(())
@@ -484,9 +534,12 @@ fn attached(window: &tauri::WebviewWindow) -> bool {
         let mut class = [0u16; 32];
         let length = GetClassNameW(parent, class.as_mut_ptr(), class.len() as i32);
         let style = GetWindowLongPtrW(handle.0, GWL_STYLE) as u32;
+        let extended = GetWindowLongPtrW(handle.0, GWL_EXSTYLE) as u32;
         IsWindow(parent) != 0
             && style & WS_CHILD != 0
+            && style & WS_DISABLED != 0
             && style & WS_CAPTION == 0
+            && extended & WS_EX_LAYERED == 0
             && String::from_utf16_lossy(&class[..length.max(0) as usize]) == "WorkerW"
     })
 }
@@ -599,19 +652,109 @@ mod tests {
             (WS_EX_APPWINDOW | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_LAYERED) as isize,
         );
         assert_ne!(style & WS_CHILD as isize, 0);
+        assert_ne!(style & WS_DISABLED as isize, 0);
+        assert_eq!(extended & WS_EX_LAYERED as isize, 0);
         assert_ne!(style & WS_CLIPCHILDREN as isize, 0);
         assert_eq!(style & (WS_POPUP | WS_OVERLAPPEDWINDOW) as isize, 0);
         assert_eq!(
             extended & (WS_EX_APPWINDOW | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE) as isize,
             0
         );
-        for flag in [
-            WS_EX_LAYERED,
-            WS_EX_TRANSPARENT,
-            WS_EX_NOACTIVATE,
-            WS_EX_TOOLWINDOW,
-        ] {
+        for flag in [WS_EX_TRANSPARENT, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW] {
             assert_ne!(extended & flag as isize, 0);
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn own_dc_window_attaches_without_layered_style_or_input() {
+        use windows_sys::Win32::{
+            Foundation::HWND,
+            System::LibraryLoader::GetModuleHandleW,
+            UI::{Input::KeyboardAndMouse::IsWindowEnabled, WindowsAndMessaging::*},
+        };
+        struct HiddenWindow(HWND);
+        impl Drop for HiddenWindow {
+            fn drop(&mut self) {
+                unsafe {
+                    DestroyWindow(self.0);
+                }
+            }
+        }
+        unsafe {
+            let instance = GetModuleHandleW(std::ptr::null());
+            let class_name: Vec<u16> = "SOEIWallpaperOwnDcTest"
+                .encode_utf16()
+                .chain(Some(0))
+                .collect();
+            let class = WNDCLASSW {
+                style: CS_OWNDC,
+                lpfnWndProc: Some(DefWindowProcW),
+                hInstance: instance,
+                lpszClassName: class_name.as_ptr(),
+                ..std::mem::zeroed()
+            };
+            assert_ne!(RegisterClassW(&class), 0);
+            let parent = HiddenWindow(CreateWindowExW(
+                0,
+                class_name.as_ptr(),
+                std::ptr::null(),
+                WS_POPUP,
+                0,
+                0,
+                64,
+                64,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                instance,
+                std::ptr::null(),
+            ));
+            assert!(!parent.0.is_null());
+            let child = HiddenWindow(CreateWindowExW(
+                0,
+                class_name.as_ptr(),
+                std::ptr::null(),
+                WS_POPUP | WS_OVERLAPPEDWINDOW,
+                0,
+                0,
+                64,
+                64,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                instance,
+                std::ptr::null(),
+            ));
+            assert!(!child.0.is_null());
+            assert_ne!(GetClassLongPtrW(child.0, GCL_STYLE) & CS_OWNDC as usize, 0);
+            attach_child(
+                child.0,
+                parent.0,
+                &Display {
+                    id: "test".into(),
+                    name: "test".into(),
+                    width: 64,
+                    height: 64,
+                    x: 0,
+                    y: 0,
+                    scale: 1.0,
+                },
+            )
+            .unwrap();
+            assert_eq!(GetParent(child.0), parent.0);
+            assert_eq!(IsWindowEnabled(child.0), 0);
+            assert_eq!(
+                GetWindowLongPtrW(child.0, GWL_EXSTYLE) & WS_EX_LAYERED as isize,
+                0
+            );
+            assert_ne!(
+                GetWindowLongPtrW(child.0, GWL_STYLE) & WS_VISIBLE as isize,
+                0
+            );
+            // 父窗口始终隐藏，测试不会显示或改变用户桌面。
+            assert_eq!(IsWindowVisible(child.0), 0);
+            drop(child);
+            drop(parent);
+            UnregisterClassW(class_name.as_ptr(), instance);
         }
     }
 }

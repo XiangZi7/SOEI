@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {
-  nextTick,
   onBeforeUnmount,
   onMounted,
   reactive,
@@ -11,18 +10,24 @@ import {
 import { storeToRefs } from 'pinia'
 import { useMusicStore } from '../../stores/music'
 import { call, desktop, onNative } from '../../bridge/native'
-import { AppIcon, UiButton, UiIconButton, UiInput } from '../../components/ui'
+import {
+  AppIcon,
+  UiButton,
+  UiIconButton,
+  WindowTitleBar,
+} from '../../components/ui'
 import SpaceHeader from './SpaceHeader.vue'
 import MusicGallery from './MusicGallery.vue'
+import SearchDialog from './SearchDialog.vue'
 import PlayerControls from '../player/PlayerControls.vue'
 import QueuePanel from '../player/QueuePanel.vue'
 import ImmersiveScene from '../visual/ImmersiveScene.vue'
 import SceneModePicker from '../visual/SceneModePicker.vue'
 import SettingsDialog from '../settings/SettingsDialog.vue'
+import WallpaperDialog from '../wallpaper/WallpaperDialog.vue'
 import type { Track } from '../../types/music'
 const store = useMusicStore()
-const { activeTrack, preferences, query, error, notice, scan } =
-  storeToRefs(store)
+const { activeTrack, preferences, error, notice, scan } = storeToRefs(store)
 // 响应式状态
 const state = reactive({
   // 沉浸场景开关
@@ -31,6 +36,8 @@ const state = reactive({
   scenePreview: false,
   // 设置弹层开关
   settingsOpen: false,
+  // 沉浸播放页的壁纸面板
+  wallpaperOpen: false,
   // 设置初始分类
   settingsCategory: 'general',
   // 搜索框开关
@@ -52,6 +59,7 @@ const {
   sceneOpen,
   scenePreview,
   settingsOpen,
+  wallpaperOpen,
   settingsCategory,
   searchOpen,
   queueOpen,
@@ -63,7 +71,6 @@ const {
 } = toRefs(state)
 const musicInput = useTemplateRef<HTMLInputElement>('musicInput')
 const lyricInput = useTemplateRef<HTMLInputElement>('lyricInput')
-const searchInput = useTemplateRef<InstanceType<typeof UiInput>>('searchInput')
 let hideTimer: ReturnType<typeof setTimeout> | undefined
 let noticeTimer: ReturnType<typeof setTimeout> | undefined
 let ambientTimer: ReturnType<typeof setTimeout> | undefined
@@ -121,9 +128,14 @@ async function select(track: Track) {
     revealControls()
   }
 }
-function openCurrentScene() {
-  state.scenePreview = false
+function openCurrentScene(preview = false) {
+  state.scenePreview = preview
   state.sceneOpen = true
+  revealControls()
+}
+function openWallpaper() {
+  if (!state.sceneOpen) openCurrentScene(!store.activeTrack)
+  state.wallpaperOpen = true
   revealControls()
 }
 function preview(track: Track | null) {
@@ -132,14 +144,16 @@ function preview(track: Track | null) {
     state.ambientColor = track?.color ?? 'var(--color-ambient-default)'
   }, 80)
 }
-async function toggleSearch() {
+function toggleSearch() {
   state.searchOpen = !state.searchOpen
-  if (state.searchOpen) {
-    await nextTick()
-    searchInput.value?.focus()
-  } else store.query = ''
 }
 function settings(category = 'general') {
+  if (desktop) {
+    void store.flushPreferences().then(saved => {
+      if (saved) void call('settings_open', { category }).catch(store.report)
+    })
+    return
+  }
   state.settingsCategory = category
   state.settingsOpen = true
 }
@@ -162,6 +176,7 @@ function revealControls() {
       state.sceneOpen &&
       !state.controlsHovered &&
       !state.settingsOpen &&
+      !state.wallpaperOpen &&
       !state.queueOpen &&
       !(
         document.activeElement instanceof HTMLElement &&
@@ -185,19 +200,17 @@ function keyboard(event: KeyboardEvent) {
     target instanceof HTMLElement &&
     !!target.closest('input,textarea,select,button,[contenteditable=true]')
   if (event.key === 'Escape') {
-    if (state.settingsOpen) return
+    if (state.settingsOpen || state.searchOpen || state.wallpaperOpen) return
     if (state.queueOpen) state.queueOpen = false
     else if (state.fullscreen) void toggleFullscreen()
     else if (state.sceneOpen) state.sceneOpen = false
-    else if (state.searchOpen) {
-      state.searchOpen = false
-      store.query = ''
-    }
     event.preventDefault()
   } else if (
     event.code === 'Space' &&
     !interactive &&
     !state.settingsOpen &&
+    !state.wallpaperOpen &&
+    !state.searchOpen &&
     !state.scenePreview
   ) {
     event.preventDefault()
@@ -224,8 +237,7 @@ onMounted(async () => {
   window.addEventListener('keydown', keyboard)
   document.addEventListener('fullscreenchange', fullscreenChange)
   await store.initialize()
-  if (desktop)
-    trayCleanup = await onNative('ui:wallpaper', () => settings('display'))
+  if (desktop) trayCleanup = await onNative('ui:wallpaper', openWallpaper)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', keyboard)
@@ -242,6 +254,7 @@ onBeforeUnmount(() => {
     :class="{
       'reduced-motion': preferences.reducedMotion,
       'has-player': activeTrack,
+      'has-window-strip': desktop && !fullscreen,
     }"
     :style="{ '--ambient-color': ambientColor }"
   >
@@ -251,91 +264,34 @@ onBeforeUnmount(() => {
     >
       <span class="ambient-beam" /><span class="ambient-reflection" />
     </div>
-    <div
+    <WindowTitleBar
       v-if="desktop && !fullscreen"
-      class="window-strip relative z-(--z-controls) flex h-6 items-center justify-between pl-4 text-muted select-none"
-      @mousedown.self="
-        call('window_action', { action: 'drag' }).catch(store.report)
-      "
-    >
-      <span class="pointer-events-none text-[8px] tracking-[.22em]">SOEI</span>
-      <div>
-        <UiButton
-          variant="ghost"
-          aria-label="最小化窗口"
-          @click="
-            call('window_action', { action: 'minimize' }).catch(store.report)
-          "
-          ><AppIcon
-            name="minus"
-            :size="12" /></UiButton
-        ><UiButton
-          variant="ghost"
-          aria-label="最大化窗口"
-          @click="
-            call('window_action', { action: 'maximize' }).catch(store.report)
-          "
-          ><AppIcon
-            name="square"
-            :size="10" /></UiButton
-        ><UiButton
-          variant="ghost"
-          class="window-close"
-          aria-label="关闭窗口"
-          @click="
-            call('window_action', { action: 'close' }).catch(store.report)
-          "
-          ><AppIcon
-            name="x"
-            :size="13"
-        /></UiButton>
-      </div>
-    </div>
+      class="fixed top-0 right-0 left-0 z-(--z-window)"
+      @close="call('window_action', { action: 'close' }).catch(store.report)"
+      @error="store.report"
+    />
     <div
       v-show="!sceneOpen"
-      class="library-view"
+      class="library-view relative isolate z-0"
     >
       <SpaceHeader
         @search="toggleSearch"
         @settings="settings()"
         @import="importMusic()"
       />
-      <Transition name="fade"
-        ><div
-          v-if="searchOpen"
-          class="mx-auto mb-7 flex w-[min(650px,85%)] items-center gap-4 rounded-input border border-line bg-surface py-1 pr-2.5 pl-5"
-        >
-          <AppIcon
-            name="search"
-            :size="18"
-          /><UiInput
-            ref="searchInput"
-            v-model="query"
-            label="搜索歌曲、歌手或专辑"
-            placeholder="搜索歌曲、歌手或专辑…"
-            class="flex-1 border-0 bg-transparent px-0 text-sm"
-          /><span
-            class="rounded-input border border-line px-1.5 py-0.5 text-[8px] text-muted"
-            >ESC</span
-          ><UiIconButton
-            icon="x"
-            label="关闭搜索"
-            @click="toggleSearch"
-            :icon-size="15"
-          /></div
-      ></Transition>
       <MusicGallery
         :test-loading="testLoading"
         @select="select"
         @preview="preview"
         @import="importMusic"
         @test="playTest"
+        @scene="openCurrentScene"
       />
     </div>
     <Transition name="scene"
       ><div
         v-if="sceneOpen"
-        class="fixed inset-0 z-(--z-scene)"
+        class="scene-view fixed inset-0 z-(--z-scene)"
         @pointermove="revealControls"
         @touchstart="revealControls"
       >
@@ -363,6 +319,14 @@ onBeforeUnmount(() => {
             compact
           />
           <div class="flex items-center gap-2">
+            <UiIconButton
+              icon="monitor"
+              label="桌面壁纸"
+              class="size-11 rounded-full border border-line bg-stage/60 backdrop-blur-xl"
+              :active="!!store.wallpaper.enabled.length"
+              :icon-size="17"
+              @click="openWallpaper"
+            />
             <UiIconButton
               icon="settings-2"
               label="场景设置"
@@ -407,6 +371,15 @@ onBeforeUnmount(() => {
       >
         <QueuePanel @close="queueOpen = false" /></div
     ></Transition>
+    <SearchDialog
+      v-if="searchOpen"
+      @close="searchOpen = false"
+      @select="select"
+    />
+    <WallpaperDialog
+      v-if="sceneOpen && wallpaperOpen"
+      @close="wallpaperOpen = false"
+    />
     <SettingsDialog
       v-if="settingsOpen"
       :initial-category="settingsCategory"
@@ -496,17 +469,11 @@ onBeforeUnmount(() => {
     transparent 65%
   );
 }
-.window-strip > div {
-  display: flex;
-  height: 100%;
+.has-window-strip {
+  padding-top: var(--spacing-window-strip);
 }
-.window-strip button {
-  width: 37px;
-  min-height: 24px;
-  padding: 0;
-}
-.window-close:hover {
-  background: var(--color-danger-soft);
+.has-window-strip .scene-view {
+  top: var(--spacing-window-strip);
 }
 .scene-controls {
   transition: opacity var(--motion-controls);

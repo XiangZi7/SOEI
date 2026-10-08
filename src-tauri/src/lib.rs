@@ -36,6 +36,7 @@ pub fn run() {
             commands::player_command,
             commands::scene_track,
             commands::lyrics_import,
+            commands::settings_open,
             commands::settings_load,
             commands::settings_save,
             commands::display_list,

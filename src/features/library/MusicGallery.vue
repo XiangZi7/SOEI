@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useMusicStore } from '../../stores/music'
 import { AppIcon, UiButton, UiInput } from '../../components/ui'
 import CoverCard from './CoverCard.vue'
-import Artwork from '../../components/ui/Artwork.vue'
+import CollectionCard from './CollectionCard.vue'
 import SceneShowcase from './SceneShowcase.vue'
 import type { Track } from '../../types/music'
 const store = useMusicStore()
@@ -25,6 +25,7 @@ defineEmits<{
   preview: [track: Track | null]
   import: [directory: boolean]
   test: []
+  scene: [preview: boolean]
 }>()
 // 响应式状态
 const state = reactive({
@@ -85,7 +86,7 @@ watch(tab, () => {
       v-if="tab === 'all' && !query && !favoritesOnly && !recentOnly"
       :test-loading="testLoading"
       @test="$emit('test')"
-      @preview="$emit('select', store.previewTrack)"
+      @preview="$emit('scene', $event)"
     />
     <div class="mt-2 mb-9 flex min-h-7 items-center justify-between gap-5">
       <p class="eyebrow max-[850px]:hidden">
@@ -166,27 +167,15 @@ watch(tab, () => {
 
     <div
       v-if="tab !== 'all' && !openGroup"
-      class="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-10"
+      class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] items-start gap-x-10 gap-y-8 max-sm:grid-cols-2 max-sm:gap-x-5"
     >
-      <UiButton
-        variant="ghost"
+      <CollectionCard
         v-for="group in groups"
         :key="group.id"
-        class="group max-w-55 flex-col items-stretch p-0 text-left"
-        @click="openGroup = group.id"
-      >
-        <span
-          class="mb-4 block aspect-square w-full border border-line transition-transform duration-(--motion-hover) group-hover:-translate-y-1"
-          ><Artwork
-            :artwork="group.tracks[0]?.artwork"
-            :src="group.tracks[0]?.coverRef"
-            :title="group.name"
-        /></span>
-        <span class="block font-display text-xl">{{ group.name }}</span
-        ><span class="mt-2 block text-caption text-muted"
-          >{{ group.tracks.length }} 首音乐</span
-        >
-      </UiButton>
+        :name="group.name"
+        :tracks="group.tracks"
+        @select="openGroup = group.id"
+      />
     </div>
     <template v-else>
       <div

@@ -62,7 +62,7 @@ function next(direction: number) {
   >
     <UiButton
       variant="ghost"
-      class="min-w-0 justify-start gap-3 px-0 text-left"
+      class="min-w-0 justify-start gap-3 px-0 text-left hover:bg-transparent"
       :disabled="!track"
       aria-label="打开当前歌曲场景"
       @click="$emit('scene')"

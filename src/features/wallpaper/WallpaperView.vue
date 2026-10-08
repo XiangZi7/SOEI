@@ -3,7 +3,7 @@ import { onBeforeUnmount, onMounted } from 'vue'
 import { useMusicStore } from '../../stores/music'
 import ImmersiveScene from '../visual/ImmersiveScene.vue'
 const store = useMusicStore()
-onMounted(() => store.initialize(true))
+onMounted(() => store.initialize('wallpaper'))
 onBeforeUnmount(() => store.dispose())
 </script>
 <template>

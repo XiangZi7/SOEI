@@ -1,0 +1,26 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "settings",
+  "description": "Settings window shares preferences and playback state with the main window",
+  "windows": [
+    "settings"
+  ],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:window:allow-destroy",
+    "allow-library-load",
+    "allow-player-snapshot",
+    "allow-player-command",
+    "allow-scene-track",
+    "allow-lyrics-import",
+    "allow-settings-load",
+    "allow-settings-save",
+    "allow-display-list",
+    "allow-wallpaper-status",
+    "allow-wallpaper-set-enabled",
+    "allow-visual-import",
+    "allow-window-action",
+    "allow-shortcuts-set"
+  ]
+}

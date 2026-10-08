@@ -128,6 +128,7 @@ export const useMusicStore = defineStore('music', () => {
   let saveTimer: ReturnType<typeof setTimeout> | undefined
   let lastSaved = ''
   let playRequest = 0
+  let pendingSave: Promise<boolean> | null = null
 
   function upsert(track: Track) {
     const index = state.realTracks.findIndex(item => item.id === track.id)
@@ -142,7 +143,7 @@ export const useMusicStore = defineStore('music', () => {
   function report(error: unknown) {
     state.error = errorMessage(error)
   }
-  async function initialize(wallpaperOnly = false) {
+  async function initialize(mode: 'main' | 'wallpaper' | 'settings' = 'main') {
     if (state.ready) return
     try {
       if (desktop) {
@@ -151,11 +152,24 @@ export const useMusicStore = defineStore('music', () => {
         )
         cleanups.push(
           await onNative<Preferences>('settings:changed', preferences => {
-            lastSaved = JSON.stringify({
-              ...defaultPreferences,
-              ...preferences,
-            })
-            state.preferences = { ...defaultPreferences, ...preferences }
+            const incoming = { ...defaultPreferences, ...preferences }
+            const serialized = JSON.stringify(incoming)
+            // 合并其他窗口的更新，保留尚未保存的本地修改。
+            if (state.ready && lastSaved) {
+              const baseline = JSON.parse(lastSaved) as Preferences
+              for (const key of Object.keys(
+                incoming
+              ) as (keyof Preferences)[]) {
+                if (
+                  JSON.stringify(state.preferences[key]) !==
+                  JSON.stringify(baseline[key])
+                ) {
+                  Object.assign(incoming, { [key]: state.preferences[key] })
+                }
+              }
+            }
+            lastSaved = serialized
+            state.preferences = incoming
           })
         )
         cleanups.push(
@@ -163,8 +177,13 @@ export const useMusicStore = defineStore('music', () => {
             state.wallpaper = status
           })
         )
-        if (!wallpaperOnly) {
-          cleanups.push(await onNative<Track>('library:track', upsert))
+        if (mode !== 'wallpaper') {
+          cleanups.push(
+            await onNative<Track>('library:track', track => {
+              upsert(track)
+              if (track.id === state.snapshot.trackId) void loadLyrics(track.id)
+            })
+          )
           cleanups.push(
             await onNative<ScanProgress>('library:scan-progress', progress => {
               state.scan = progress
@@ -179,7 +198,7 @@ export const useMusicStore = defineStore('music', () => {
         state.preferences = { ...defaultPreferences, ...preferences }
         acceptSnapshot(await call<PlaybackSnapshot>('player_snapshot'))
         state.wallpaper = await call<WallpaperStatus>('wallpaper_status')
-        if (!wallpaperOnly && state.preferences.queue.length)
+        if (mode === 'main' && state.preferences.queue.length)
           await command('queue', {
             queue: state.preferences.queue.filter(id =>
               state.realTracks.some(track => track.id === id)
@@ -232,22 +251,41 @@ export const useMusicStore = defineStore('music', () => {
       () => {
         if (!state.ready) return
         clearTimeout(saveTimer)
-        saveTimer = setTimeout(async () => {
-          const serialized = JSON.stringify(state.preferences)
-          if (serialized === lastSaved) return
-          try {
-            if (desktop)
-              await call('settings_save', { value: state.preferences })
-            else localStorage.setItem('soei-preferences', serialized)
-            lastSaved = serialized
-          } catch (error) {
-            report(error)
-          }
+        saveTimer = setTimeout(() => {
+          void flushPreferences()
         }, 250)
       },
       { deep: true }
     )
   )
+
+  async function flushPreferences(): Promise<boolean> {
+    clearTimeout(saveTimer)
+    if (!state.ready) return true
+    if (pendingSave) {
+      if (!(await pendingSave)) return false
+      return flushPreferences()
+    }
+    const serialized = JSON.stringify(state.preferences)
+    if (serialized === lastSaved) return true
+    pendingSave = (async () => {
+      try {
+        if (desktop)
+          await call('settings_save', { value: JSON.parse(serialized) })
+        else localStorage.setItem('soei-preferences', serialized)
+        lastSaved = serialized
+        return true
+      } catch (error) {
+        report(error)
+        return false
+      }
+    })()
+    try {
+      return await pendingSave
+    } finally {
+      pendingSave = null
+    }
+  }
 
   if (audio) {
     const events: (keyof HTMLMediaElementEventMap)[] = [
@@ -523,6 +561,7 @@ export const useMusicStore = defineStore('music', () => {
   function dispose() {
     cleanups.forEach(cleanup => cleanup())
     clearTimeout(saveTimer)
+    void flushPreferences()
     if (audio) {
       audio.pause()
       audio.src = ''
@@ -538,6 +577,7 @@ export const useMusicStore = defineStore('music', () => {
     lyrics,
     queueTracks,
     initialize,
+    flushPreferences,
     select,
     command,
     setQueue,

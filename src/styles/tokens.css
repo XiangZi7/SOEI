@@ -31,6 +31,7 @@
   --text-caption: 0.625rem;
   --text-label: 0.75rem;
   --spacing-control: 2.5rem;
+  --spacing-window-strip: 24px;
   --spacing-page: clamp(1.5rem, 5vw, 5rem);
   --radius-input: 4px;
   --radius-panel: 8px;
@@ -50,6 +51,7 @@
   --z-scene: 10;
   --z-controls: 20;
   --z-popover: 30;
+  --z-window: 40;
   --z-notification: 50;
   --gradient-space:
     radial-gradient(ellipse at 52% -12%, #26343730, transparent 56%),
