@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  computed,
   onBeforeUnmount,
   onMounted,
   reactive,
@@ -26,8 +27,11 @@ import SceneModePicker from '../visual/SceneModePicker.vue'
 import SettingsDialog from '../settings/SettingsDialog.vue'
 import WallpaperDialog from '../wallpaper/WallpaperDialog.vue'
 import type { Track } from '../../types/music'
+import Artwork from '../../components/ui/Artwork.vue'
 const store = useMusicStore()
-const { activeTrack, preferences, error, notice, scan } = storeToRefs(store)
+const { activeTrack, previewTrack, preferences, error, notice, scan } =
+  storeToRefs(store)
+const backgroundTrack = computed(() => activeTrack.value ?? previewTrack.value)
 // 响应式状态
 const state = reactive({
   // 沉浸场景开关
@@ -198,7 +202,9 @@ function keyboard(event: KeyboardEvent) {
   const target = event.target
   const interactive =
     target instanceof HTMLElement &&
-    !!target.closest('input,textarea,select,button,[contenteditable=true]')
+    !!target.closest(
+      'input,textarea,select,button,summary,[contenteditable=true]'
+    )
   if (event.key === 'Escape') {
     if (state.settingsOpen || state.searchOpen || state.wallpaperOpen) return
     if (state.queueOpen) state.queueOpen = false
@@ -233,6 +239,16 @@ watch(notice, () => {
     store.notice = ''
   }, 6000)
 })
+watch(
+  () => store.wallpaper.enabled.length,
+  (enabled, previouslyEnabled) => {
+    if (previouslyEnabled > 0 && enabled === 0) {
+      state.sceneOpen = false
+      state.wallpaperOpen = false
+      state.queueOpen = false
+    }
+  }
+)
 onMounted(async () => {
   window.addEventListener('keydown', keyboard)
   document.addEventListener('fullscreenchange', fullscreenChange)
@@ -253,7 +269,6 @@ onBeforeUnmount(() => {
     class="music-space relative isolate min-h-dvh"
     :class="{
       'reduced-motion': preferences.reducedMotion,
-      'has-player': activeTrack,
       'has-window-strip': desktop && !fullscreen,
     }"
     :style="{ '--ambient-color': ambientColor }"
@@ -262,10 +277,27 @@ onBeforeUnmount(() => {
       class="ambient-background pointer-events-none fixed inset-0 -z-10 overflow-hidden"
       aria-hidden="true"
     >
+      <Transition
+        name="ambient-cover"
+        appear
+        ><div
+          v-if="backgroundTrack"
+          :key="backgroundTrack.id"
+          class="library-cover-layer"
+        >
+          <Artwork
+            class="library-cover-background"
+            eager
+            :artwork="backgroundTrack.artwork"
+            :src="backgroundTrack.coverRef"
+            :title="backgroundTrack.title"
+          /></div
+      ></Transition>
+      <span class="library-cover-shade" />
       <span class="ambient-beam" /><span class="ambient-reflection" />
     </div>
     <WindowTitleBar
-      v-if="desktop && !fullscreen"
+      v-if="desktop && !fullscreen && sceneOpen"
       class="fixed top-0 right-0 left-0 z-(--z-window)"
       @close="call('window_action', { action: 'close' }).catch(store.report)"
       @error="store.report"
@@ -278,7 +310,16 @@ onBeforeUnmount(() => {
         @search="toggleSearch"
         @settings="settings()"
         @import="importMusic()"
-      />
+        ><template
+          v-if="desktop && !fullscreen"
+          #window
+          ><WindowTitleBar
+            embedded
+            @close="
+              call('window_action', { action: 'close' }).catch(store.report)
+            "
+            @error="store.report" /></template
+      ></SpaceHeader>
       <MusicGallery
         :test-loading="testLoading"
         @select="select"
@@ -287,7 +328,32 @@ onBeforeUnmount(() => {
         @test="playTest"
         @scene="openCurrentScene"
       />
+      <div class="library-note">
+        <div class="library-motto shrink-0 font-display">
+          <p
+            class="text-[13px] leading-[1.8] tracking-[.15em]"
+            lang="ja"
+          >
+            音が、<br />世界をつくる。
+          </p>
+          <p class="mt-2 text-[10px] leading-[1.6] tracking-[.08em] text-muted">
+            Every song.<br />becomes a visual world.
+          </p>
+        </div>
+      </div>
     </div>
+    <footer
+      v-show="!sceneOpen"
+      class="space-colophon mx-auto flex items-end justify-between font-display text-[9px] leading-[1.7] tracking-[.2em] text-muted"
+    >
+      <p>A NEW WAY TO FEEL MUSIC.<br />FOR A MORE BEAUTIFUL TOMORROW.</p>
+      <p
+        lang="ja"
+        class="max-sm:hidden"
+      >
+        音楽で、少しだけ特別に。
+      </p>
+    </footer>
     <Transition name="scene"
       ><div
         v-if="sceneOpen"
@@ -295,7 +361,12 @@ onBeforeUnmount(() => {
         @pointermove="revealControls"
         @touchstart="revealControls"
       >
-        <ImmersiveScene :preview="scenePreview" />
+        <ImmersiveScene
+          :preview="scenePreview"
+          @queue="queueOpen = !queueOpen"
+          @fullscreen="toggleFullscreen"
+          @close="sceneOpen = false"
+        />
         <div
           class="scene-controls absolute top-9 right-[5%] left-[5%] flex items-center justify-between gap-3 max-sm:top-5 max-sm:right-[4%] max-sm:left-[4%]"
           :class="{ 'controls-hidden': !controlsVisible }"
@@ -335,39 +406,25 @@ onBeforeUnmount(() => {
               :icon-size="17"
             />
           </div>
-        </div>
-        <div
-          class="scene-controls absolute right-[5%] bottom-9 left-[5%] mx-auto max-w-260 max-sm:right-[4%] max-sm:bottom-5 max-sm:left-[4%]"
-          :class="{ 'controls-hidden': !controlsVisible }"
-          @pointerenter="controlsHovered = true"
-          @pointerleave="leaveControls"
-          @focusin="revealControls"
-        >
-          <PlayerControls
-            :preview="scenePreview"
-            floating
-            @queue="queueOpen = !queueOpen"
-            @fullscreen="toggleFullscreen"
-            @scene="settings('lyrics')"
-          />
         </div></div
     ></Transition>
-    <Transition name="fade"
-      ><div
-        v-if="activeTrack && !sceneOpen"
-        class="fixed right-[5%] bottom-5 left-[5%] z-(--z-controls) max-sm:right-[3%] max-sm:bottom-3 max-sm:left-[3%]"
-      >
-        <PlayerControls
-          compact
-          @scene="openCurrentScene"
-          @queue="queueOpen = !queueOpen"
-          @fullscreen="toggleFullscreen"
-        /></div
-    ></Transition>
+    <div
+      class="player-dock scene-controls fixed right-[5%] bottom-9 left-[5%] z-(--z-controls) mx-auto max-w-260 max-sm:right-[4%] max-sm:bottom-5 max-sm:left-[4%]"
+      @pointerenter="controlsHovered = true"
+      @pointerleave="leaveControls"
+      @focusin="revealControls"
+    >
+      <PlayerControls
+        :preview="sceneOpen ? scenePreview : !activeTrack"
+        @queue="queueOpen = !queueOpen"
+        @fullscreen="toggleFullscreen"
+        @scene="sceneOpen ? settings('lyrics') : openCurrentScene(!activeTrack)"
+      />
+    </div>
     <Transition name="fade"
       ><div
         v-if="queueOpen"
-        class="fixed right-[5%] bottom-28 z-(--z-popover) max-sm:right-[3%] max-sm:bottom-32"
+        class="fixed right-[5%] bottom-36 z-(--z-popover) max-sm:right-[3%] max-sm:bottom-25"
       >
         <QueuePanel @close="queueOpen = false" /></div
     ></Transition>
@@ -440,6 +497,45 @@ onBeforeUnmount(() => {
   </main>
 </template>
 <style scoped>
+.music-space {
+  --navigation-height: 112px;
+  padding: calc(var(--navigation-height) + 24px) 3vw 166px;
+}
+.library-view {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.library-note {
+  margin: 4px 28px 20px;
+}
+.library-motto {
+  width: 142px;
+  color: #cecec4;
+}
+.space-colophon {
+  max-width: 1280px;
+  padding: 20px 28px 0;
+  opacity: 0.65;
+}
+.library-cover-layer {
+  position: absolute;
+  inset: 0;
+}
+.library-cover-background {
+  position: absolute;
+  inset: -32px;
+  width: calc(100% + 64px);
+  height: calc(100% + 64px);
+  opacity: 0.26;
+  filter: blur(22px) saturate(0.65);
+}
+.library-cover-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, #04090880, #04090825 50%, #040908b0),
+    linear-gradient(90deg, #04090850, transparent 60%, #04090840);
+}
 .ambient-background {
   background: var(--gradient-space);
 }
@@ -469,9 +565,6 @@ onBeforeUnmount(() => {
     transparent 65%
   );
 }
-.has-window-strip {
-  padding-top: var(--spacing-window-strip);
-}
 .has-window-strip .scene-view {
   top: var(--spacing-window-strip);
 }
@@ -486,10 +579,30 @@ onBeforeUnmount(() => {
   opacity: 1;
   pointer-events: auto;
 }
-.has-player .library-view {
-  padding-bottom: 95px;
-}
 .notification.is-error {
   border-color: var(--color-danger-soft);
+}
+@media (max-width: 1000px) {
+  .music-space {
+    --navigation-height: 160px;
+  }
+  .library-motto {
+    width: 100px;
+  }
+}
+@media (max-width: 600px) {
+  .music-space {
+    padding: calc(var(--navigation-height) + 18px) 12px 110px;
+  }
+  .library-note {
+    margin: 8px 18px 18px;
+  }
+  .library-motto {
+    display: none;
+  }
+  .space-colophon {
+    padding-top: 15px;
+    font-size: 8px;
+  }
 }
 </style>

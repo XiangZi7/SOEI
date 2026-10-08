@@ -2,7 +2,12 @@
 import type { ArtworkCrop } from '../../types/music'
 import { assetUrl } from '../../bridge/native'
 import AppIcon from './AppIcon.vue'
-defineProps<{ artwork?: ArtworkCrop; src?: string | null; title?: string }>()
+defineProps<{
+  artwork?: ArtworkCrop
+  src?: string | null
+  title?: string
+  eager?: boolean
+}>()
 </script>
 <template>
   <svg
@@ -24,7 +29,7 @@ defineProps<{ artwork?: ArtworkCrop; src?: string | null; title?: string }>()
     class="block size-full object-cover"
     :src="assetUrl(src)"
     :alt="title ?? '音乐封面'"
-    loading="lazy"
+    :loading="eager ? 'eager' : 'lazy'"
   />
   <div
     v-else

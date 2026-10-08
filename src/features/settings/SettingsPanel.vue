@@ -72,7 +72,7 @@ async function applyShortcuts(clear = false) {
     aria-labelledby="settings-title"
   >
     <div
-      class="flex-between shrink-0 border-b border-line px-8 py-6 max-sm:px-5"
+      class="flex-between min-h-30 shrink-0 border-b border-line px-8 py-7 max-sm:px-5"
     >
       <div>
         <p class="eyebrow">MAKE THIS SPACE YOURS</p>
@@ -102,7 +102,7 @@ async function applyShortcuts(clear = false) {
           variant="ghost"
           v-for="item in categories"
           :key="item.id"
-          class="flex w-full justify-between gap-3 rounded-none border-l-2 py-3 pr-5 pl-5 text-left font-display text-label max-sm:w-auto max-sm:whitespace-nowrap"
+          class="flex min-h-(--spacing-header-control) w-full justify-between gap-3 rounded-none border-l-2 py-3 pr-5 pl-5 text-left font-display text-label max-sm:w-auto max-sm:whitespace-nowrap"
           :class="
             category === item.id
               ? 'border-accent bg-hover text-ink'

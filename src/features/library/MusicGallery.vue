@@ -5,7 +5,6 @@ import { useMusicStore } from '../../stores/music'
 import { AppIcon, UiButton, UiInput } from '../../components/ui'
 import CoverCard from './CoverCard.vue'
 import CollectionCard from './CollectionCard.vue'
-import SceneShowcase from './SceneShowcase.vue'
 import type { Track } from '../../types/music'
 const store = useMusicStore()
 defineProps<{ testLoading?: boolean }>()
@@ -19,6 +18,7 @@ const {
   recentOnly,
   preferences,
   snapshot,
+  previewId,
 } = storeToRefs(store)
 defineEmits<{
   select: [track: Track]
@@ -79,16 +79,13 @@ watch(tab, () => {
 </script>
 <template>
   <section
-    class="mx-auto w-full max-w-450 px-6 sm:px-[5vw] xl:px-[7.3vw]"
+    class="music-gallery w-full px-7 max-sm:px-4.5"
     aria-label="音乐封面画廊"
   >
-    <SceneShowcase
-      v-if="tab === 'all' && !query && !favoritesOnly && !recentOnly"
-      :test-loading="testLoading"
-      @test="$emit('test')"
-      @preview="$emit('scene', $event)"
-    />
-    <div class="mt-2 mb-9 flex min-h-7 items-center justify-between gap-5">
+    <div
+      v-if="tab !== 'all' || query || favoritesOnly || recentOnly"
+      class="mb-5 flex min-h-7 items-center justify-between gap-5"
+    >
       <p class="eyebrow max-[850px]:hidden">
         {{
           realTracks.length ? 'YOUR PERSONAL UNIVERSE' : 'A UNIVERSE OF SOUNDS'
@@ -198,7 +195,7 @@ watch(tab, () => {
           v-for="track in tab === 'all' ? filteredTracks : groupTracks"
           :key="track.id"
           :track="track"
-          :featured="featured && track.id === 'demo-7'"
+          :featured="featured && track.id === previewId"
           :show-title="preferences.showTitles"
           :playing="
             snapshot.trackId === track.id && snapshot.status === 'playing'
@@ -254,59 +251,59 @@ watch(tab, () => {
       >
     </div>
     <footer
-      class="flex flex-wrap items-center justify-between gap-5 pt-12 pb-8"
+      class="gallery-footer flex items-center justify-between gap-4 pt-5 pb-3"
     >
-      <span
-        class="font-display text-[8px] leading-relaxed tracking-[.24em] text-muted"
-        >EVERY SONG.<br />ANOTHER WORLD.</span
+      <span class="font-display text-[10px] tracking-[.16em] text-muted"
+        >{{ filteredTracks.length.toString().padStart(2, '0') }}
+        {{ realTracks.length ? 'TRACKS' : 'VISUAL STUDIES' }}</span
       >
       <span
         v-if="!realTracks.length"
-        class="text-[9px] tracking-wide text-muted max-[850px]:order-3 max-[850px]:w-full"
-        >示例画廊 · 点击封面预览视觉，导入音乐开始聆听</span
+        class="text-[9px] tracking-wide text-muted max-sm:hidden"
+        >点击封面，走进音乐的世界。</span
       >
-      <span
-        class="font-display text-[11px] tracking-widest text-muted max-sm:text-[9px]"
-        lang="ja"
-        >音楽で、まだ見ぬ景色へ。</span
+      <span class="font-display text-[11px] tracking-wider text-muted"
+        ><button
+          class="flex min-h-8 items-center gap-2 hover:text-ink"
+          :disabled="testLoading"
+          @click="$emit('test')"
+        >
+          <AppIcon
+            :name="testLoading ? 'loader-circle' : 'play'"
+            :size="12"
+            :class="{ 'animate-spin': testLoading }"
+          />{{ testLoading ? '正在准备…' : '播放测试' }}
+        </button></span
       >
     </footer>
   </section>
 </template>
 <style scoped>
 .cover-grid {
-  --cover-size: clamp(120px, 12.5vw, 190px);
   display: grid;
-  grid-template-columns: repeat(5, var(--cover-size));
-  justify-content: space-between;
-  gap: clamp(28px, 3.2vw, 48px) 30px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 22px 20px;
 }
 .collection-actions .active {
   color: var(--color-ink);
   text-decoration: underline;
   text-underline-offset: 6px;
 }
-@media (min-width: 1700px) {
-  .cover-grid {
-    --cover-size: 205px;
-  }
-}
 @media (max-width: 1100px) {
   .cover-grid {
-    --cover-size: 14.5vw;
-    column-gap: 16px;
+    gap: 20px 16px;
   }
 }
 @media (max-width: 850px) {
   .cover-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 25px;
+    gap: 20px;
   }
 }
 @media (max-width: 500px) {
   .cover-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 22px;
+    gap: 16px;
   }
 }
 </style>

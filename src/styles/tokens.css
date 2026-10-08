@@ -24,14 +24,16 @@
   --color-selection: #99bcba4a;
   --color-scrollbar: #b4c3c52b;
   --font-display:
-    'Baskerville', 'Iowan Old Style', 'Palatino Linotype', 'Yu Mincho',
-    'Noto Serif CJK SC', 'SimSun', serif;
-  --font-ui: 'Segoe UI', 'Microsoft YaHei', 'Yu Gothic', sans-serif;
+    'SOEI Cormorant', 'SOEI Mincho', 'Baskerville', 'Iowan Old Style',
+    'Palatino Linotype', 'Yu Mincho', 'Noto Serif CJK SC', 'SimSun', serif;
+  --font-ui:
+    'SOEI Cormorant', 'SOEI Mincho', 'Segoe UI', 'Microsoft YaHei', serif;
   --font-hand: 'STKaiti', 'KaiTi', 'Kaiti SC', 'Yu Mincho', serif;
   --text-caption: 0.625rem;
   --text-label: 0.75rem;
   --spacing-control: 2.5rem;
-  --spacing-window-strip: 24px;
+  --spacing-window-strip: 38px;
+  --spacing-header-control: 44px;
   --spacing-page: clamp(1.5rem, 5vw, 5rem);
   --radius-input: 4px;
   --radius-panel: 8px;

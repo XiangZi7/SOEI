@@ -38,7 +38,7 @@ function select(track: Track) {
     @close="emit('close')"
   >
     <header
-      class="flex items-center gap-3 border-b border-line px-6 py-4 max-sm:px-4"
+      class="flex min-h-22 items-center gap-3 border-b border-line px-6 py-5 max-sm:px-4"
     >
       <AppIcon
         name="search"

@@ -3,7 +3,9 @@ import { call } from '../../bridge/native'
 import AppIcon from './AppIcon.vue'
 import UiButton from './UiButton.vue'
 
-withDefaults(defineProps<{ title?: string }>(), { title: 'SOEI' })
+withDefaults(defineProps<{ title?: string; embedded?: boolean }>(), {
+  title: 'SOEI',
+})
 const emit = defineEmits<{ close: []; error: [error: unknown] }>()
 function action(action: 'drag' | 'minimize' | 'maximize') {
   void call('window_action', { action }).catch(error => emit('error', error))
@@ -15,14 +17,17 @@ function drag(event: MouseEvent) {
 
 <template>
   <header
-    class="window-strip flex h-(--spacing-window-strip) shrink-0 items-center justify-between border-b border-line bg-space/95 pl-4 text-muted backdrop-blur-xl select-none"
+    class="window-strip flex h-(--spacing-window-strip) shrink-0 items-center justify-between bg-transparent pl-4 text-muted select-none"
+    :class="{ embedded }"
     aria-label="窗口标题栏"
     @mousedown.self="drag"
     @dblclick.self="action('maximize')"
   >
-    <span class="pointer-events-none text-[8px] tracking-[.22em]">{{
-      title
-    }}</span>
+    <span
+      v-if="!embedded"
+      class="pointer-events-none font-display text-[11px] tracking-[.18em]"
+      >{{ title }}</span
+    >
     <div class="flex h-full">
       <UiButton
         variant="ghost"
@@ -56,8 +61,13 @@ function drag(event: MouseEvent) {
 </template>
 
 <style scoped>
+.window-strip.embedded {
+  width: 138px;
+  height: 44px;
+  padding-left: 0;
+}
 .window-action {
-  width: 37px;
+  width: 46px;
   min-height: 0;
   height: 100%;
   padding: 0;

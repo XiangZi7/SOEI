@@ -9,6 +9,7 @@ import SceneIllustration from './SceneIllustration.vue'
 const props = defineProps<{
   artwork?: ArtworkCrop
   cover?: string | null
+  trackKey?: string
   background: string
   video: boolean
   color: string
@@ -33,9 +34,14 @@ useStageRenderer(canvas, () => props)
     aria-hidden="true"
   >
     <div class="absolute inset-0 bg-(image:--gradient-stage)" />
-    <Transition name="fade">
+    <Transition name="ambient-cover">
       <div
-        :key="background || cover || artwork?.source || 'empty'"
+        :key="
+          background ||
+          trackKey ||
+          cover ||
+          (artwork ? `${artwork.source}-${artwork.x}-${artwork.y}` : 'empty')
+        "
         class="absolute inset-0 size-full"
         :class="
           background
@@ -55,11 +61,13 @@ useStageRenderer(canvas, () => props)
         />
         <Artwork
           v-else-if="background"
+          eager
           :src="background"
           title="场景背景"
         />
         <Artwork
           v-else
+          eager
           :artwork="artwork"
           :src="cover"
           title="封面光场"

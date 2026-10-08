@@ -19,7 +19,8 @@ const track: Track = {
 async function render(
   lines: { id: string; startMs: number; text: string }[],
   index: number,
-  demo = false
+  demo = false,
+  wallpaperCover = false
 ) {
   return renderToString(
     createSSRApp({
@@ -32,6 +33,7 @@ async function render(
           seed: 0,
           animated: false,
           reducedMotion: true,
+          wallpaperCover,
           showcase: true,
         }),
     })
@@ -60,5 +62,15 @@ describe('封面舞台始终显示对应歌曲', () => {
     const html = await render([], -1, true)
     expect(html).toContain('视觉预览')
     expect(html).not.toContain('此刻正在听')
+  })
+  it('普通封面保持原布局，双栏窗口仅用于壁纸状态', async () => {
+    const lines = [{ id: 'line', startMs: 0, text: '真正的歌词' }]
+    const regular = await render(lines, 0)
+    expect(regular).not.toContain('cover-chrome')
+    const wallpaper = await render(lines, 0, false, true)
+    expect(wallpaper).toContain('cover-chrome')
+    expect(wallpaper).toContain('当前歌曲歌词')
+    expect(wallpaper).toContain(track.title)
+    expect(wallpaper).toContain('真正的歌词')
   })
 })

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import KineticLyrics from './KineticLyrics.vue'
+import CoverComposition from './CoverComposition.vue'
 import type { LyricLine, SceneLayout, Track } from '../../types/music'
 import Artwork from '../../components/ui/Artwork.vue'
 import { isKineticLayout } from './lyricStoryboard'
@@ -14,6 +15,8 @@ const props = defineProps<{
   seed: number
   animated: boolean
   reducedMotion: boolean
+  wallpaperCover?: boolean
+  energy?: number[]
   showcase?: boolean
 }>()
 const current = computed(() => props.lines[props.index]?.text ?? '')
@@ -47,13 +50,42 @@ const { enter, leave, cancel } = useLyricTransitions(() => ({
   <div
     class="lyric-stage absolute grid items-center"
     :class="
-      showcase
-        ? 'inset-x-[13%] top-[23%] bottom-[26%] max-sm:inset-x-[7%]'
-        : 'inset-x-[10%] top-[23%] bottom-[26%] max-sm:inset-x-[7%] max-sm:top-[24%] max-sm:bottom-[30%]'
+      wallpaperCover && layout === 'title'
+        ? 'cover-stage inset-x-[10%] top-[20%] bottom-[22%] max-sm:inset-x-[4%] max-sm:top-[24%] max-sm:bottom-[26%]'
+        : showcase
+          ? 'inset-x-[13%] top-[23%] bottom-[26%] max-sm:inset-x-[7%]'
+          : 'inset-x-[10%] top-[23%] bottom-[26%] max-sm:inset-x-[7%] max-sm:top-[24%] max-sm:bottom-[30%]'
     "
   >
+    <Transition
+      v-if="wallpaperCover && layout === 'title'"
+      name="song-change"
+      mode="out-in"
+      ><CoverComposition
+        :key="track?.id ?? 'empty'"
+        :track="track"
+        :lines="lines"
+        :index="index"
+        :energy="energy"
+      >
+        <template
+          v-if="$slots['cover-progress']"
+          #progress
+          ><slot name="cover-progress"
+        /></template>
+        <template
+          v-if="$slots['cover-controls']"
+          #controls
+          ><slot name="cover-controls"
+        /></template>
+        <template
+          v-if="$slots['cover-window']"
+          #window
+          ><slot name="cover-window"
+        /></template> </CoverComposition
+    ></Transition>
     <template
-      v-if="
+      v-else-if="
         layout === 'title' ||
         (lines.length && (current || layout === 'readable'))
       "

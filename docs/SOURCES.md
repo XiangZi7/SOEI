@@ -15,7 +15,8 @@
 | rodio/Symphonia/RustFFT | crates.io，音频/解码/频谱 | rodio 和 RustFFT MIT / Apache-2.0；Symphonia MPL-2.0 |
 | Lofty/rusqlite/image/rfd/walkdir/blake3/rand | crates.io，元数据/存储/封面/导入 | 正式清单按 Cargo.lock 对应 LICENSE 生成 |
 | UI 参考图 | 用户提供的 ui稿，public/art/music-space.png 为副本 | 未提供对外分发许可，目前仅为本地开发参考 |
-| 字体 | 系统字体回退：Segoe UI/Microsoft YaHei/Palatino Linotype/Yu Mincho/SimSun 等 | 未嵌入或分发字体文件；实际外观随系统变化 |
+| 英文衬线字体 | [Google Fonts 官方仓库 / Cormorant Garamond](https://github.com/google/fonts/tree/main/ofl/cormorantgaramond)，本地完整可变字体及真实斜体 | SIL Open Font License 1.1；字体与许可证位于 public/fonts/，不访问在线 CDN |
+| 中日文衬线字体 | [Google Fonts 官方仓库 / Noto Serif SC](https://github.com/google/fonts/tree/main/ofl/notoserifsc)，本地完整可变字体 | SIL Open Font License 1.1；未裁剪字库，支持离线导入歌词；许可证位于 public/fonts/ |
 | WAV/LRC/损坏测试文件 | scripts/generate-fixtures.mjs 自行生成 | 不含第三方歌曲，可自由使用这些测试样本 |
 | 一键播放测试旋律与歌词 | scripts/generate-playback-demo.mjs 自行合成与编写，public/demo/soei-test.wav 与 soei-test.lrc | 不含第三方歌曲或歌词，可自由使用 |
 | 一键播放测试封面 | public/demo/soei-test-cover.svg 自行绘制的月光山水矢量图 | 不含第三方图片，可自由使用 |

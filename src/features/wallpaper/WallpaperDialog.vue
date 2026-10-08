@@ -44,7 +44,7 @@ async function applyWallpaper(enabled: string[]) {
       aria-labelledby="wallpaper-title"
     >
       <header
-        class="flex-between shrink-0 border-b border-line px-7 py-5 max-sm:px-5"
+        class="flex-between min-h-28 shrink-0 border-b border-line px-7 py-7 max-sm:px-5"
       >
         <div>
           <p class="eyebrow">DISPLAY &amp; WALLPAPER</p>

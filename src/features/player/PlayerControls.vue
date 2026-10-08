@@ -2,34 +2,18 @@
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMusicStore } from '../../stores/music'
-import { UiButton, UiIconButton, UiSlider, UiPanel } from '../../components/ui'
+import { UiButton, UiIconButton } from '../../components/ui'
 import Artwork from '../../components/ui/Artwork.vue'
 import PlaybackSeekBar from './PlaybackSeekBar.vue'
-const props = defineProps<{
-  preview?: boolean
-  compact?: boolean
-  floating?: boolean
-}>()
+import PlaybackTransport from './PlaybackTransport.vue'
+
+const props = defineProps<{ preview?: boolean }>()
 defineEmits<{ scene: []; queue: []; fullscreen: [] }>()
 const store = useMusicStore()
 const { activeTrack, previewTrack, snapshot } = storeToRefs(store)
 const track = computed(() =>
   props.preview ? previewTrack.value : activeTrack.value
 )
-const modes = ['sequential', 'repeat', 'one', 'shuffle']
-const modeLabel = computed(
-  () =>
-    ({
-      sequential: '顺序播放',
-      repeat: '列表循环',
-      one: '单曲循环',
-      shuffle: '随机播放',
-    })[snapshot.value.repeatMode]
-)
-function repeat() {
-  const index = modes.indexOf(snapshot.value.repeatMode)
-  void store.command('repeat', { mode: modes[(index + 1) % modes.length] })
-}
 const seek = (positionMs: number) =>
   store.command('seek', { value: positionMs })
 function volume(event: Event) {
@@ -37,132 +21,319 @@ function volume(event: Event) {
     value: Number((event.target as HTMLInputElement).value),
   })
 }
-function next(direction: number) {
-  if (props.preview) {
-    const index = store.demos.findIndex(item => item.id === store.previewId)
-    store.previewId =
-      store.demos[
-        (index + direction + store.demos.length) % store.demos.length
-      ]!.id
-  } else void store.command(direction === 1 ? 'next' : 'previous')
-}
 </script>
 
 <template>
-  <UiPanel
-    class="grid min-h-19 grid-cols-[minmax(170px,1fr)_minmax(120px,1fr)_auto_auto_auto] items-center gap-5.5 px-5 py-2.5 max-[700px]:grid-cols-[minmax(100px,1fr)_auto_auto] max-[700px]:gap-1 max-[700px]:px-3 max-lg:grid-cols-[minmax(160px,1fr)_minmax(90px,1fr)_auto_auto] max-lg:gap-2.5"
-    :class="[
-      { compact },
-      floating
-        ? 'min-h-22 rounded-full border-white/10 bg-stage/85 px-7 shadow-[0_15px_60px_#00000045] backdrop-blur-xl max-[700px]:rounded-2xl max-[700px]:px-4'
-        : '',
-    ]"
+  <div
+    class="player-bar"
     role="region"
     aria-label="播放控制"
   >
-    <UiButton
-      variant="ghost"
-      class="min-w-0 justify-start gap-3 px-0 text-left hover:bg-transparent"
-      :disabled="!track"
-      aria-label="打开当前歌曲场景"
-      @click="$emit('scene')"
-    >
-      <span
-        class="size-11 shrink-0 overflow-hidden rounded-input border border-line max-[700px]:size-9"
-        ><Artwork
-          :artwork="track?.artwork"
-          :src="track?.coverRef"
-          :title="track?.title"
-      /></span>
-      <span class="min-w-0"
-        ><span
-          class="block truncate-text font-display text-[15px] max-[700px]:text-sm"
-          >{{ track?.title ?? '还没有开始聆听' }}</span
-        ><span class="mt-1 block text-[9px] text-muted">{{
-          preview
-            ? '视觉预览 · 无音频'
-            : (track?.artist ?? '导入音乐，打开你的空间')
-        }}</span></span
+    <div class="player-record">
+      <UiButton
+        variant="ghost"
+        class="player-song"
+        :disabled="!track"
+        aria-label="打开当前歌曲场景"
+        @click="$emit('scene')"
       >
-    </UiButton>
-    <PlaybackSeekBar
-      class="max-[700px]:col-span-3 max-[700px]:row-start-2"
-      :snapshot="snapshot"
-      :disabled="preview || !track || !snapshot.durationMs"
-      :preview="preview"
-      :seek="seek"
-    />
-    <div class="flex items-center gap-0.5">
-      <UiIconButton
-        class="mr-1.5 size-9 opacity-65 max-[700px]:hidden"
-        :icon="
-          snapshot.repeatMode === 'shuffle'
-            ? 'shuffle'
-            : snapshot.repeatMode === 'one'
-              ? 'repeat-1'
-              : 'repeat'
-        "
-        :icon-size="15"
-        :disabled="preview || !track"
-        :label="modeLabel ?? '播放模式'"
-        @click="repeat"
-      />
-      <UiIconButton
-        class="size-9 max-[700px]:size-7"
-        icon="skip-back"
-        :icon-size="17"
-        :disabled="!track"
-        :label="preview ? '上一个示例' : '上一首'"
-        @click="next(-1)"
-      />
-      <UiIconButton
-        class="mx-1 size-9 max-[700px]:size-7"
-        :icon="snapshot.status === 'playing' && !preview ? 'pause' : 'play'"
-        :icon-size="24"
-        :disabled="preview || !track"
-        :label="snapshot.status === 'playing' ? '暂停' : '播放'"
-        @click="store.command('toggle')"
-      />
-      <UiIconButton
-        class="size-9 max-[700px]:size-7"
-        icon="skip-forward"
-        :icon-size="17"
-        :disabled="!track"
-        :label="preview ? '下一个示例' : '下一首'"
-        @click="next(1)"
+        <Transition
+          name="song-change"
+          mode="out-in"
+          ><span
+            :key="track?.id ?? 'empty'"
+            class="player-song-content"
+            ><span class="player-artwork"
+              ><Artwork
+                eager
+                :artwork="track?.artwork"
+                :src="track?.coverRef"
+                :title="track?.title"
+            /></span>
+            <span class="player-label"
+              ><span class="player-title">{{
+                track?.title ?? '还没有开始聆听'
+              }}</span
+              ><span class="player-artist">{{
+                track?.artist ?? '导入音乐，打开你的空间'
+              }}</span></span
+            ></span
+          ></Transition
+        >
+      </UiButton>
+      <PlaybackSeekBar
+        class="player-seek"
+        rail
+        :snapshot="snapshot"
+        :disabled="preview || !track || !snapshot.durationMs"
+        :preview="preview"
+        :seek="seek"
       />
     </div>
-    <div class="flex items-center max-lg:hidden">
-      <UiIconButton
-        :icon="snapshot.volume ? 'volume-2' : 'volume-x'"
-        :icon-size="16"
+    <PlaybackTransport
+      :preview="preview"
+      @queue="$emit('queue')"
+    />
+    <div class="player-volume">
+      <UiButton
+        variant="icon"
+        class="volume-button"
         :disabled="preview"
-        :label="snapshot.volume ? '静音' : '取消静音'"
+        :aria-label="snapshot.volume ? '静音' : '取消静音'"
+        :title="snapshot.volume ? '静音' : '取消静音'"
         @click="store.command('volume', { value: snapshot.volume ? 0 : 0.65 })"
-      /><UiSlider
-        class="w-18"
-        label="音量"
-        :max="1"
-        :step="0.01"
-        :model-value="snapshot.volume"
+      >
+        <svg
+          viewBox="0 0 20 20"
+          width="16"
+          height="16"
+          aria-hidden="true"
+        >
+          <path
+            fill="currentColor"
+            d="M2 7h3l5-4v14l-5-4H2z"
+          />
+          <g
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.2"
+          >
+            <path
+              v-if="snapshot.volume"
+              d="M12 6a6 6 0 0 1 0 8m2-10a9 9 0 0 1 0 12"
+            />
+            <path
+              v-else
+              d="m13 7 5 6m0-6-5 6"
+            />
+          </g>
+        </svg>
+      </UiButton>
+      <input
+        class="volume-slider"
+        type="range"
+        aria-label="音量"
+        min="0"
+        max="1"
+        step="0.01"
+        :value="snapshot.volume"
         :disabled="preview"
+        :style="{ '--volume': snapshot.volume * 100 + '%' }"
         @input="volume"
       />
     </div>
-    <div class="flex items-center gap-0.5">
-      <UiIconButton
-        class="max-[700px]:size-7"
-        icon="list-music"
-        :icon-size="17"
-        label="播放队列"
-        @click="$emit('queue')"
-      /><UiIconButton
-        class="max-[700px]:size-7"
-        icon="maximize"
-        :icon-size="16"
-        label="切换全屏"
-        @click="$emit('fullscreen')"
-      />
-    </div>
-  </UiPanel>
+    <UiIconButton
+      class="player-fullscreen"
+      icon="maximize"
+      :icon-size="15"
+      label="切换全屏"
+      @click="$emit('fullscreen')"
+    />
+  </div>
 </template>
+
+<style scoped>
+.player-bar {
+  position: relative;
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.45fr) minmax(150px, 1.1fr) minmax(120px, 1fr)
+    36px;
+  align-items: center;
+  gap: clamp(12px, 2.8%, 30px);
+  width: 100%;
+  max-width: 840px;
+  min-height: 90px;
+  margin-inline: auto;
+  padding: 9px 35px 9px 8px;
+  border: 1px solid #d1d4c62e;
+  border-radius: 7px;
+  color: #edece5;
+  background: linear-gradient(105deg, #1b25224f, #080d0c8a 48%, #0b100d8a);
+  backdrop-filter: blur(18px);
+  box-shadow:
+    inset 0 1px #ffffff04,
+    0 8px 32px #0003;
+}
+.player-record {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0;
+}
+.player-song {
+  flex: 1;
+  justify-content: flex-start;
+  min-width: 0;
+  padding: 0;
+  gap: 18px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.player-song-content {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  align-items: center;
+  gap: 18px;
+}
+.player-song:hover {
+  background: transparent;
+}
+.player-artwork {
+  display: block;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid #ffffff26;
+  border-radius: 3px;
+}
+.player-label {
+  display: block;
+  min-width: 0;
+}
+.player-title {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: 0.015em;
+}
+.player-artist {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 10px;
+  line-height: 1.4;
+  letter-spacing: 0.08em;
+  color: #c6c7bb;
+}
+.player-seek {
+  flex: 0 0 0;
+  width: 0;
+}
+.player-volume {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding-left: 24px;
+}
+.volume-button {
+  width: 28px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 3px;
+}
+.volume-button:disabled {
+  opacity: 0.55;
+}
+.volume-slider {
+  width: min(100%, 120px);
+  min-width: 38px;
+  height: 24px;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+}
+.volume-slider::-webkit-slider-runnable-track {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    #eeede3 var(--volume),
+    #c9ccbe38 var(--volume)
+  );
+}
+.volume-slider::-webkit-slider-thumb {
+  width: 4px;
+  height: 4px;
+  margin-top: -1.5px;
+  appearance: none;
+  border: 0;
+  border-radius: 50%;
+  background: #eeede3;
+}
+.volume-slider::-moz-range-track {
+  height: 1px;
+  background: #c9ccbe38;
+}
+.volume-slider::-moz-range-progress {
+  height: 1px;
+  background: #eeede3;
+}
+.volume-slider::-moz-range-thumb {
+  width: 4px;
+  height: 4px;
+  border: 0;
+  background: #eeede3;
+}
+.player-fullscreen {
+  width: 32px;
+  height: 36px;
+  border-radius: 3px;
+}
+@media (max-width: 740px) {
+  .player-volume {
+    padding-left: 0;
+  }
+  .player-bar {
+    grid-template-columns: minmax(0, 1.5fr) 100px minmax(55px, 0.65fr) 28px;
+    gap: 7px;
+    min-height: 58px;
+    padding: 6px 30px 6px 6px;
+  }
+  .player-song {
+    gap: 8px;
+  }
+  .player-song-content {
+    gap: 8px;
+  }
+  .player-artwork {
+    width: 40px;
+    height: 40px;
+  }
+  .player-title {
+    font-size: 14px;
+  }
+  .player-artist {
+    font-size: 8px;
+  }
+  .player-fullscreen {
+    width: 28px;
+  }
+}
+@media (max-width: 560px) {
+  .player-bar {
+    grid-template-columns: minmax(0, 1fr) 86px 27px;
+    gap: 6px;
+    min-height: 62px;
+  }
+  .player-song {
+    gap: 7px;
+  }
+  .player-song-content {
+    gap: 7px;
+  }
+  .player-label {
+    padding-bottom: 0;
+  }
+  .player-title {
+    font-size: 13px;
+  }
+  .player-artist {
+    margin-top: 2px;
+    font-size: 8px;
+  }
+  .player-volume {
+    display: none;
+  }
+}
+</style>
