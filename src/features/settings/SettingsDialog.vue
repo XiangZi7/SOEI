@@ -14,6 +14,7 @@ import {
   UiDialog,
 } from '../../components/ui'
 import SettingRow from './SettingRow.vue'
+import { sceneModes } from '../visual/sceneModes'
 const props = defineProps<{ initialCategory?: string }>()
 const emit = defineEmits<{ close: []; lyrics: [] }>()
 const store = useMusicStore()
@@ -55,11 +56,16 @@ onMounted(() => {
   void store.refreshDisplays()
 })
 async function applyWallpaper() {
+  if (state.busy) return
   state.busy = true
-  await store.setWallpaper(state.selectedDisplays)
-  state.busy = false
+  try {
+    await store.setWallpaper([...state.selectedDisplays])
+  } finally {
+    state.busy = false
+  }
 }
 function disableWallpaper() {
+  if (state.busy) return
   state.selectedDisplays = []
   void applyWallpaper()
 }
@@ -195,9 +201,13 @@ async function applyShortcuts(clear = false) {
               v-model="preferences.layout"
               class="text-[11px]"
               label="歌词排版"
-              ><option value="artistic">错位分层</option>
-              <option value="readable">留白易读</option>
-              <option value="title">标题与歌词</option></UiSelect
+              ><option
+                v-for="mode in sceneModes"
+                :key="mode.id"
+                :value="mode.id"
+              >
+                {{ mode.name }} · {{ mode.description }}
+              </option></UiSelect
             ></SettingRow
           >
           <SettingRow title="歌词字号"
@@ -264,7 +274,7 @@ async function applyShortcuts(clear = false) {
           >
           <SettingRow
             title="减少动态效果"
-            hint="关闭场景位移与音频光效，保留必要的状态反馈。"
+            hint="关闭背景光场运动与歌词入场动画，也会遵循系统的减少动态效果设置。"
             ><UiSwitch
               v-model="preferences.reducedMotion"
               label="减少动态效果"
@@ -329,7 +339,7 @@ async function applyShortcuts(clear = false) {
         <template v-else-if="category === 'performance'">
           <SettingRow
             title="视觉质量"
-            hint="省电模式关闭音频光效；减少动态效果可进一步降低画面变化。"
+            hint="高质量最高 60 帧，平衡模式最高 30 帧；省电模式使用静态光场。"
             ><UiSelect
               v-model="preferences.quality"
               class="text-[11px]"

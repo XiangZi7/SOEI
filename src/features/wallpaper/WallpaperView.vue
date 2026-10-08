@@ -8,17 +8,9 @@ onBeforeUnmount(() => store.dispose())
 </script>
 <template>
   <main
-    class="wallpaper-view"
+    class="pointer-events-none h-screen w-screen overflow-hidden"
     :class="{ 'reduced-motion': store.preferences.reducedMotion }"
   >
     <ImmersiveScene wallpaper />
   </main>
 </template>
-<style scoped>
-.wallpaper-view {
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-  pointer-events: none;
-}
-</style>

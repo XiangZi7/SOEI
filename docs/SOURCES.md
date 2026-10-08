@@ -6,6 +6,10 @@
 | --- | --- | --- |
 | Vue/Pinia/Router/I18n/VueUse | npm 官方包，前端技术栈 | MIT；I18n/VueUse 尚未接入完整功能 |
 | Tailwind/插件/tailwind-merge | npm 官方包，主题、构建和 class 合并 | MIT |
+| Three.js / @types/three | npm 官方包，歌词舞台的背景光场与类型声明 | MIT |
+| GSAP | npm 官方包，歌词入场、淡出与交错动画 | GSAP Standard License，见包内 LICENSE 与 https://gsap.com/standard-license/ |
+| Folia 歌词舞台参考 | 用户指定的 https://github.com/chthollyphile/folia-major ，阅读 Cadenza 构图与 Tempera 分镜代码，参考深色光场、片段强调、确定性构图和逐字入场 | 未复制该仓库代码、图片、歌词；本项目舞台与预览文案独立实现 |
+| JIZURA 文字 PV 参考 | 用户指定的 https://github.com/852wa/JIZURA ，阅读 src/06_layouts.js、05_anim.js、07_decor.js 与 docs/EXPRESSION_PACKS.md，参考构图/运动/装饰组合、竖排、大小字、框线和种子重组 | 源仓库 MIT；未复制源代码或素材，Vue/Tailwind/GSAP 适配独立实现 |
 | Iconify Vue/Lucide | npm 官方包，本地图标子集 | Iconify MIT；Lucide ISC；来自 Feather 的图标还涉及 MIT |
 | Tauri/插件 | crates.io，窗口/IPC/托盘/组合键 | MIT / Apache-2.0 |
 | rodio/Symphonia/RustFFT | crates.io，音频/解码/频谱 | rodio 和 RustFFT MIT / Apache-2.0；Symphonia MPL-2.0 |

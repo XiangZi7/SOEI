@@ -1,29 +1,84 @@
 <script setup lang="ts">
 import type { SceneLayout } from '../../types/music'
 import { sceneModes } from './sceneModes'
+import { AppIcon } from '../../components/ui'
+import { nextTick, useTemplateRef, watch } from 'vue'
+import { useResizeObserver } from '@vueuse/core'
 
 defineProps<{ compact?: boolean }>()
 const model = defineModel<SceneLayout>({ required: true })
+const seed = defineModel<number>('seed', { required: true })
+const choices = useTemplateRef<HTMLElement>('choices')
+const buttons = useTemplateRef<HTMLButtonElement[]>('buttons')
+function revealSelected() {
+  const selected = buttons.value?.find(
+    button => button.dataset.mode === model.value
+  )
+  if (choices.value && selected)
+    choices.value.scrollLeft =
+      selected.offsetLeft -
+      (choices.value.clientWidth - selected.offsetWidth) / 2
+}
+watch(model, async () => {
+  await nextTick()
+  revealSelected()
+})
+useResizeObserver(choices, revealSelected)
 </script>
 
 <template>
-  <div class="scene-mode-picker" :class="{ compact }" role="group" aria-label="歌词场景风格">
-    <button v-for="mode in sceneModes" :key="mode.id" class="mode-option" :class="{ selected: model === mode.id }" :aria-pressed="model === mode.id" :title="mode.description" @click="model = mode.id">
-      <span class="mode-number">{{ mode.number }}</span>
-      <span>{{ mode.name }}</span>
-      <span class="mode-indicator" aria-hidden="true" />
+  <div
+    class="flex min-w-0 items-center gap-1.5 rounded-full border border-line bg-stage/70 p-1.5 backdrop-blur-xl"
+    role="group"
+    aria-label="歌词场景风格"
+  >
+    <div
+      ref="choices"
+      class="relative flex min-w-0 gap-1 overflow-x-auto"
+      :class="compact ? 'max-w-[58vw] sm:max-w-[65vw]' : 'max-w-[78vw]'"
+    >
+      <button
+        v-for="mode in sceneModes"
+        :key="mode.id"
+        ref="buttons"
+        :data-mode="mode.id"
+        class="flex min-h-11 shrink-0 items-center gap-2 rounded-full text-label transition-colors duration-200 hover:bg-hover hover:text-ink max-sm:gap-1.5"
+        :class="[
+          model === mode.id ? 'bg-white/7 text-ink' : 'text-stage-muted',
+          compact ? 'px-3 max-sm:px-2.5' : 'px-3.5 max-sm:px-3',
+        ]"
+        :aria-pressed="model === mode.id"
+        :title="mode.description"
+        @click="model = mode.id"
+      >
+        <span
+          class="text-[9px] tabular-nums"
+          :class="{ 'max-sm:hidden': compact }"
+          >{{ mode.number }}</span
+        >
+        <span>{{ mode.name }}</span>
+        <span
+          class="size-1 rounded-full"
+          :class="[
+            model === mode.id
+              ? 'bg-stage-gold shadow-[0_0_9px_#e8c87970]'
+              : 'bg-transparent',
+            { 'max-sm:hidden': compact },
+          ]"
+          aria-hidden="true"
+        />
+      </button>
+    </div>
+    <button
+      class="flex size-11 shrink-0 items-center justify-center rounded-full border-l border-line text-stage-gold transition-colors hover:bg-hover"
+      title="重新组合当前歌曲的构图"
+      aria-label="换个分镜"
+      @click="seed = (seed ?? 0) + 1"
+    >
+      <AppIcon
+        name="shuffle"
+        :size="16"
+      />
     </button>
   </div>
 </template>
-
-<style scoped>
-.scene-mode-picker { display: flex; gap: 6px; padding: 5px; border: 1px solid var(--color-line); border-radius: 999px; background: #070c17b3; backdrop-filter: blur(16px); }
-.mode-option { min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 19px; border-radius: 999px; color: var(--color-muted); font-size: 12px; transition: color 220ms, background 220ms; }
-.mode-option:hover { color: var(--color-ink); background: var(--color-hover); }
-.mode-option.selected { color: var(--color-ink); background: #ffffff12; }
-.mode-number { color: #b3bdcc; font-size: 9px; font-variant-numeric: tabular-nums; }
-.mode-indicator { width: 4px; height: 4px; border-radius: 50%; background: transparent; }
-.selected .mode-indicator { background: var(--color-stage-gold); box-shadow: 0 0 9px #e8c87970; }
-.compact .mode-option { padding: 0 14px; }
-@media (max-width: 650px) { .mode-option { gap: 7px; padding: 0 12px; } .compact .mode-number, .compact .mode-indicator { display: none; } .compact .mode-option { padding: 0 13px; } }
-</style>

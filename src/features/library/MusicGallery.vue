@@ -5,6 +5,7 @@ import { useMusicStore } from '../../stores/music'
 import { AppIcon, UiButton, UiInput } from '../../components/ui'
 import CoverCard from './CoverCard.vue'
 import Artwork from '../../components/ui/Artwork.vue'
+import SceneShowcase from './SceneShowcase.vue'
 import type { Track } from '../../types/music'
 const store = useMusicStore()
 defineProps<{ testLoading?: boolean }>()
@@ -80,6 +81,12 @@ watch(tab, () => {
     class="mx-auto w-full max-w-450 px-6 sm:px-[5vw] xl:px-[7.3vw]"
     aria-label="音乐封面画廊"
   >
+    <SceneShowcase
+      v-if="tab === 'all' && !query && !favoritesOnly && !recentOnly"
+      :test-loading="testLoading"
+      @test="$emit('test')"
+      @preview="$emit('select', store.previewTrack)"
+    />
     <div class="mt-2 mb-9 flex min-h-7 items-center justify-between gap-5">
       <p class="eyebrow max-[850px]:hidden">
         {{
@@ -131,31 +138,6 @@ watch(tab, () => {
             :size="15"
         /></UiButton>
       </div>
-    </div>
-
-    <div
-      class="mb-8 flex flex-wrap items-center justify-between gap-4 rounded-input border border-line bg-surface px-5 py-4"
-    >
-      <div>
-        <p class="text-label text-ink">先听一首，试试歌词</p>
-        <p class="mt-1 text-caption text-muted">
-          36 秒自制旋律 + 同步测试歌词，可暂停、拖动进度
-        </p>
-      </div>
-      <UiButton
-        variant="ghost"
-        class="shrink-0 gap-2 text-accent"
-        :disabled="testLoading"
-        :aria-busy="testLoading"
-        @click="$emit('test')"
-      >
-        <AppIcon
-          :name="testLoading ? 'loader-circle' : 'play'"
-          :size="16"
-          :class="{ 'animate-spin': testLoading }"
-        />
-        {{ testLoading ? '正在准备…' : '播放测试' }}
-      </UiButton>
     </div>
 
     <div

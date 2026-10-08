@@ -227,12 +227,7 @@ pub async fn wallpaper_set_enabled(
 }
 #[tauri::command]
 pub fn wallpaper_status(state: State<AppState>) -> AppResult<WallpaperStatus> {
-    state
-        .wallpaper
-        .0
-        .lock()
-        .map(|value| value.clone())
-        .map_err(|_| AppError::new("WALLPAPER", "壁纸状态不可用"))
+    state.wallpaper.status()
 }
 #[tauri::command]
 pub async fn visual_import(window: WebviewWindow, app: AppHandle) -> AppResult<Option<String>> {

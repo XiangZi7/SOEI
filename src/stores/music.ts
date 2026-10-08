@@ -20,7 +20,8 @@ import type {
 export const defaultPreferences: Preferences = {
   showTitles: false,
   reducedMotion: false,
-  layout: 'artistic',
+  layout: 'manuscript',
+  sceneSeed: 0,
   lyricSize: 42,
   lyricOffset: 0,
   quality: 'balanced',
@@ -279,23 +280,26 @@ export const useMusicStore = defineStore('music', () => {
       events.forEach(event => audio.removeEventListener(event, update))
     )
   }
-  async function command(action: string, args: Record<string, unknown> = {}) {
+  async function command(
+    action: string,
+    args: Record<string, unknown> = {}
+  ): Promise<boolean> {
     try {
       if (desktop) {
         acceptSnapshot(
           await call<PlaybackSnapshot>('player_command', { action, ...args })
         )
-        return
+        return true
       }
-      if (!audio) return
+      if (!audio) return false
       if (action === 'play') {
         const track = state.realTracks.find(track => track.id === args.id)
-        if (!track) return
+        if (!track) return false
         const request = ++playRequest
         audio.src = track.localPath
         audio.volume = state.snapshot.volume
         await audio.play()
-        if (request !== playRequest) return
+        if (request !== playRequest) return false
         state.snapshot.trackId = track.id
         state.snapshot.sessionId += 1
         state.snapshot.positionMs = Math.round(audio.currentTime * 1000)
@@ -305,13 +309,14 @@ export const useMusicStore = defineStore('music', () => {
         state.snapshot.status = audio.paused ? 'paused' : 'playing'
         track.lastPlayed = Date.now() / 1000
       } else if (action === 'toggle') {
-        if (!state.snapshot.trackId) return
+        if (!state.snapshot.trackId) return false
         if (audio.paused) await audio.play()
         else audio.pause()
       } else if (action === 'volume') {
         state.snapshot.volume = Math.max(0, Math.min(1, Number(args.value)))
         audio.volume = state.snapshot.volume
-      } else if (action === 'seek' && Number.isFinite(audio.duration)) {
+      } else if (action === 'seek') {
+        if (!Number.isFinite(audio.duration)) return false
         audio.currentTime = Math.min(
           audio.duration,
           Math.max(0, Number(args.value) / 1000)
@@ -338,8 +343,10 @@ export const useMusicStore = defineStore('music', () => {
           state.snapshot.status = 'stopped'
         }
       }
+      return true
     } catch (error) {
       report(error)
+      return false
     }
   }
   async function select(track: Track) {

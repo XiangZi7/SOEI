@@ -2,10 +2,14 @@
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMusicStore } from '../../stores/music'
-import { formatTime } from '../lyrics/lrc'
 import { UiButton, UiIconButton, UiSlider, UiPanel } from '../../components/ui'
 import Artwork from '../../components/ui/Artwork.vue'
-const props = defineProps<{ preview?: boolean; compact?: boolean }>()
+import PlaybackSeekBar from './PlaybackSeekBar.vue'
+const props = defineProps<{
+  preview?: boolean
+  compact?: boolean
+  floating?: boolean
+}>()
 defineEmits<{ scene: []; queue: []; fullscreen: [] }>()
 const store = useMusicStore()
 const { activeTrack, previewTrack, snapshot } = storeToRefs(store)
@@ -22,20 +26,12 @@ const modeLabel = computed(
       shuffle: '随机播放',
     })[snapshot.value.repeatMode]
 )
-const progress = computed(() =>
-  snapshot.value.durationMs
-    ? (snapshot.value.positionMs / snapshot.value.durationMs) * 100
-    : 0
-)
 function repeat() {
   const index = modes.indexOf(snapshot.value.repeatMode)
   void store.command('repeat', { mode: modes[(index + 1) % modes.length] })
 }
-function seek(event: Event) {
-  void store.command('seek', {
-    value: Number((event.target as HTMLInputElement).value),
-  })
-}
+const seek = (positionMs: number) =>
+  store.command('seek', { value: positionMs })
 function volume(event: Event) {
   void store.command('volume', {
     value: Number((event.target as HTMLInputElement).value),
@@ -55,7 +51,12 @@ function next(direction: number) {
 <template>
   <UiPanel
     class="grid min-h-19 grid-cols-[minmax(170px,1fr)_minmax(120px,1fr)_auto_auto_auto] items-center gap-5.5 px-5 py-2.5 max-[700px]:grid-cols-[minmax(100px,1fr)_auto_auto] max-[700px]:gap-1 max-[700px]:px-3 max-lg:grid-cols-[minmax(160px,1fr)_minmax(90px,1fr)_auto_auto] max-lg:gap-2.5"
-    :class="{ compact }"
+    :class="[
+      { compact },
+      floating
+        ? 'min-h-22 rounded-full border-white/10 bg-stage/85 px-7 shadow-[0_15px_60px_#00000045] backdrop-blur-xl max-[700px]:rounded-2xl max-[700px]:px-4'
+        : '',
+    ]"
     role="region"
     aria-label="播放控制"
   >
@@ -84,26 +85,13 @@ function next(direction: number) {
         }}</span></span
       >
     </UiButton>
-    <div
-      class="flex items-center gap-2.5 max-[700px]:col-span-3 max-[700px]:row-start-2"
-    >
-      <UiSlider
-        class="w-full"
-        label="播放进度"
-        :max="Math.max(1, snapshot.durationMs)"
-        :model-value="snapshot.positionMs"
-        :disabled="preview || !track || !snapshot.durationMs"
-        :style="{ '--progress': progress + '%' }"
-        @change="seek"
-      />
-      <span class="text-[8px] whitespace-nowrap text-muted tabular-nums">{{
-        preview
-          ? 'PREVIEW'
-          : formatTime(snapshot.positionMs) +
-            ' / ' +
-            formatTime(snapshot.durationMs)
-      }}</span>
-    </div>
+    <PlaybackSeekBar
+      class="max-[700px]:col-span-3 max-[700px]:row-start-2"
+      :snapshot="snapshot"
+      :disabled="preview || !track || !snapshot.durationMs"
+      :preview="preview"
+      :seek="seek"
+    />
     <div class="flex items-center gap-0.5">
       <UiIconButton
         class="mr-1.5 size-9 opacity-65 max-[700px]:hidden"

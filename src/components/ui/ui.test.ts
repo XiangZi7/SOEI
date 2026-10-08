@@ -15,6 +15,10 @@ describe('UI 组件公共接口', () => {
       )
     ).toBe('text-label flex gap-5 text-muted')
   })
+  it('场景控件可用 Tailwind 圆角覆盖自定义组件圆角', () => {
+    expect(mergeUiClasses('rounded-input', 'rounded-full')).toBe('rounded-full')
+    expect(mergeUiClasses('rounded-panel', 'rounded-2xl')).toBe('rounded-2xl')
+  })
   it('按钮透传属性，加载中禁用且不会意外提交表单', async () => {
     const html = await renderToString(
       createSSRApp({

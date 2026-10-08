@@ -41,7 +41,14 @@ export interface LyricLine {
   text: string
 }
 export type LibraryTab = 'all' | 'albums' | 'artists' | 'playlists'
-export type SceneLayout = 'artistic' | 'readable' | 'title'
+export type SceneLayout =
+  | 'manuscript'
+  | 'artistic'
+  | 'collage'
+  | 'echo'
+  | 'montage'
+  | 'readable'
+  | 'title'
 export interface Playlist {
   id: string
   name: string
@@ -51,6 +58,7 @@ export interface Preferences {
   showTitles: boolean
   reducedMotion: boolean
   layout: SceneLayout
+  sceneSeed: number
   lyricSize: number
   lyricOffset: number
   quality: 'high' | 'balanced' | 'power'

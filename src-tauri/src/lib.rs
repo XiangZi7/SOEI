@@ -5,10 +5,7 @@ mod model;
 mod storage;
 mod wallpaper;
 
-use std::{
-    path::PathBuf,
-    sync::{atomic::AtomicBool, Mutex},
-};
+use std::{path::PathBuf, sync::atomic::AtomicBool};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{TrayIconBuilder, TrayIconEvent},
@@ -73,7 +70,7 @@ pub fn run() {
                 cache_dir: cache,
                 scan_cancel: AtomicBool::new(false),
                 scan_busy: AtomicBool::new(false),
-                wallpaper: wallpaper::WallpaperService(Mutex::new(Default::default())),
+                wallpaper: wallpaper::WallpaperService::default(),
             });
             let open = MenuItem::with_id(app, "open", "打开 SOEI", true, None::<&str>)?;
             let toggle = MenuItem::with_id(app, "toggle", "播放 / 暂停", true, None::<&str>)?;

@@ -11,6 +11,9 @@
   --color-focus: #d3e7e5;
   --color-favorite: #ead6d4;
   --color-ambient-default: #7cacc8;
+  --color-stage: #080d18;
+  --color-stage-muted: #aab8ce;
+  --color-stage-gold: #e8c879;
   --color-danger: #e5a7a0;
   --color-danger-soft: #914a4766;
   --color-line: #dededb26;
@@ -24,6 +27,7 @@
     'Baskerville', 'Iowan Old Style', 'Palatino Linotype', 'Yu Mincho',
     'Noto Serif CJK SC', 'SimSun', serif;
   --font-ui: 'Segoe UI', 'Microsoft YaHei', 'Yu Gothic', sans-serif;
+  --font-hand: 'STKaiti', 'KaiTi', 'Kaiti SC', 'Yu Mincho', serif;
   --text-caption: 0.625rem;
   --text-label: 0.75rem;
   --spacing-control: 2.5rem;
@@ -71,4 +75,14 @@
     #10191d 65%,
     #070c0d
   );
+  --gradient-stage:
+    radial-gradient(
+      ellipse at 65% 42%,
+      color-mix(in srgb, var(--stage-color) 17%, transparent),
+      transparent 65%
+    ),
+    linear-gradient(125deg, #080c14, #101a30 55%, #080d18);
+  --gradient-stage-shade:
+    radial-gradient(ellipse at 50% 45%, transparent 15%, #04081188 100%),
+    linear-gradient(0deg, #050913a6, transparent 30%);
 }

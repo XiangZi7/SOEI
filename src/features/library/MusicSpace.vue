@@ -17,6 +17,7 @@ import MusicGallery from './MusicGallery.vue'
 import PlayerControls from '../player/PlayerControls.vue'
 import QueuePanel from '../player/QueuePanel.vue'
 import ImmersiveScene from '../visual/ImmersiveScene.vue'
+import SceneModePicker from '../visual/SceneModePicker.vue'
 import SettingsDialog from '../settings/SettingsDialog.vue'
 import type { Track } from '../../types/music'
 const store = useMusicStore()
@@ -340,7 +341,7 @@ onBeforeUnmount(() => {
       >
         <ImmersiveScene :preview="scenePreview" />
         <div
-          class="scene-controls absolute top-15 right-[5.5%] left-[5.5%] flex justify-between max-sm:top-6"
+          class="scene-controls absolute top-9 right-[5%] left-[5%] flex items-center justify-between gap-3 max-sm:top-5 max-sm:right-[4%] max-sm:left-[4%]"
           :class="{ 'controls-hidden': !controlsVisible }"
           @pointerenter="controlsHovered = true"
           @pointerleave="leaveControls"
@@ -348,36 +349,31 @@ onBeforeUnmount(() => {
         >
           <UiButton
             variant="ghost"
-            class="border-0 bg-glass text-[11px]"
+            class="min-h-11 gap-2 rounded-full border border-line bg-stage/60 px-4 text-label backdrop-blur-xl max-sm:px-3"
             @click="sceneOpen = false"
             ><AppIcon
               name="arrow-left"
               :size="15"
-            />音乐空间</UiButton
+            /><span class="max-sm:hidden">音乐空间</span
+            ><span class="hidden max-sm:inline">返回</span></UiButton
           >
-          <div class="flex items-center gap-5 max-sm:gap-3">
-            <UiButton
-              variant="ghost"
-              class="scene-layout min-h-10 font-display text-[9px] tracking-widest text-muted"
-              :class="{ active: preferences.layout === 'artistic' }"
-              @click="preferences.layout = 'artistic'"
-              >LYRICS</UiButton
-            ><UiButton
-              variant="ghost"
-              class="scene-layout min-h-10 font-display text-[9px] tracking-widest text-muted"
-              :class="{ active: preferences.layout === 'title' }"
-              @click="preferences.layout = 'title'"
-              >TITLE</UiButton
-            ><UiIconButton
+          <SceneModePicker
+            v-model="preferences.layout"
+            v-model:seed="preferences.sceneSeed"
+            compact
+          />
+          <div class="flex items-center gap-2">
+            <UiIconButton
               icon="settings-2"
               label="场景设置"
+              class="size-11 rounded-full border border-line bg-stage/60 backdrop-blur-xl"
               @click="settings('visual')"
               :icon-size="17"
             />
           </div>
         </div>
         <div
-          class="scene-controls absolute right-[5.5%] bottom-9 left-[5.5%] max-sm:right-[4%] max-sm:bottom-5 max-sm:left-[4%]"
+          class="scene-controls absolute right-[5%] bottom-9 left-[5%] mx-auto max-w-260 max-sm:right-[4%] max-sm:bottom-5 max-sm:left-[4%]"
           :class="{ 'controls-hidden': !controlsVisible }"
           @pointerenter="controlsHovered = true"
           @pointerleave="leaveControls"
@@ -385,6 +381,7 @@ onBeforeUnmount(() => {
         >
           <PlayerControls
             :preview="scenePreview"
+            floating
             @queue="queueOpen = !queueOpen"
             @fullscreen="toggleFullscreen"
             @scene="settings('lyrics')"
@@ -521,10 +518,6 @@ onBeforeUnmount(() => {
 .scene-controls.controls-hidden:focus-within {
   opacity: 1;
   pointer-events: auto;
-}
-.scene-layout.active {
-  color: var(--color-ink);
-  border-bottom: 1px solid var(--color-ink);
 }
 .has-player .library-view {
   padding-bottom: 95px;
