@@ -17,7 +17,7 @@
 
 ```vue
 <script setup lang="ts">
-import { UiButton, UiSwitch, AppIcon } from '@/components/ui'
+import { UiButton, UiSwitch, AppIcon } from '../../components/ui'
 </script>
 <template>
   <UiButton variant="solid"><AppIcon name="plus" />导入音乐</UiButton>

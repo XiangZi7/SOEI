@@ -476,9 +476,9 @@ mod tests {
     }
     #[test]
     fn wav_decode_seek_and_pcm_analysis() {
-        let data = include_bytes!("../../tests/fixtures/测试音楽.wav");
-        let mut decoder =
-            Decoder::try_from(std::io::Cursor::new(data.as_slice())).expect("decode WAV");
+        let path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/测试音楽.wav");
+        let mut decoder = Decoder::try_from(File::open(path).unwrap()).expect("decode WAV");
         assert_eq!(decoder.total_duration().unwrap().as_millis(), 12_000);
         decoder
             .try_seek(Duration::from_millis(6500))
@@ -496,5 +496,40 @@ mod tests {
             .expect("seek analyzed source");
         assert!(source.next().is_some());
         assert!(Decoder::try_from(std::io::Cursor::new(b"corrupted audio")).is_err());
+    }
+    #[test]
+    #[ignore = "需要当前 Windows 会话具备可用音频输出设备"]
+    fn native_output_seek_pause_resume() {
+        let stream = OutputStreamBuilder::open_default_stream().expect("open audio device");
+        let sink = Sink::connect_new(stream.mixer());
+        sink.set_volume(0.0);
+        let path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/测试音楽.wav");
+        sink.append(Decoder::try_from(File::open(path).unwrap()).unwrap());
+        std::thread::sleep(Duration::from_millis(180));
+        assert!(!sink.empty());
+        assert!(sink.get_pos() > Duration::ZERO);
+        sink.pause();
+        std::thread::sleep(Duration::from_millis(80));
+        let paused = sink.get_pos();
+        std::thread::sleep(Duration::from_millis(160));
+        assert_eq!(sink.get_pos(), paused);
+        sink.try_seek(Duration::from_millis(6500))
+            .expect("native seek");
+        sink.play();
+        std::thread::sleep(Duration::from_millis(160));
+        assert!(sink.get_pos() >= Duration::from_millis(6500));
+        sink.try_seek(Duration::from_millis(1000))
+            .expect("backward native seek");
+        assert!(sink.get_pos() < Duration::from_millis(2000));
+        sink.stop();
+        // stop 在设备的下一次回调中生效，不能把控制请求当作已消费的结果。
+        for _ in 0..50 {
+            if sink.empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(sink.empty());
     }
 }
