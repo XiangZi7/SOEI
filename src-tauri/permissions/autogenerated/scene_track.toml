@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-scene-track"
+description = "Enables the scene_track command without any pre-configured scope."
+commands.allow = ["scene_track"]
+
+[[permission]]
+identifier = "deny-scene-track"
+description = "Denies the scene_track command without any pre-configured scope."
+commands.deny = ["scene_track"]

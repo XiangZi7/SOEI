@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-library-cancel"
+description = "Enables the library_cancel command without any pre-configured scope."
+commands.allow = ["library_cancel"]
+
+[[permission]]
+identifier = "deny-library-cancel"
+description = "Denies the library_cancel command without any pre-configured scope."
+commands.deny = ["library_cancel"]

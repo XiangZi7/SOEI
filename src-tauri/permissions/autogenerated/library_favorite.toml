@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-library-favorite"
+description = "Enables the library_favorite command without any pre-configured scope."
+commands.allow = ["library_favorite"]
+
+[[permission]]
+identifier = "deny-library-favorite"
+description = "Denies the library_favorite command without any pre-configured scope."
+commands.deny = ["library_favorite"]

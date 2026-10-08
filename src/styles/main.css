@@ -1,0 +1,99 @@
+@import 'tailwindcss';
+@import './tokens.css';
+@import './utilities.css';
+
+@layer base {
+  :root {
+    font-family: var(--font-ui);
+    color: var(--color-ink);
+    background: var(--color-canvas);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    color-scheme: dark;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    min-width: 360px;
+  }
+  button,
+  input,
+  select {
+    font: inherit;
+  }
+  button {
+    color: inherit;
+    cursor: pointer;
+    background: none;
+    border: 0;
+    padding: 0;
+  }
+  button:disabled {
+    opacity: var(--opacity-disabled);
+    cursor: not-allowed;
+  }
+  :is(button, input, select, a):focus-visible {
+    outline: 1px solid var(--color-focus);
+    outline-offset: 5px;
+  }
+  button,
+  a,
+  input,
+  select {
+    -webkit-tap-highlight-color: transparent;
+  }
+  ::selection {
+    background: var(--color-selection);
+  }
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-scrollbar);
+    border-radius: var(--radius-input);
+  }
+  input[type='range'] {
+    accent-color: var(--color-accent);
+    cursor: pointer;
+    height: 3px;
+  }
+}
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity var(--motion-hover);
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+.scene-enter-active,
+.scene-leave-active {
+  transition:
+    opacity var(--motion-scene),
+    transform var(--motion-scene);
+}
+.scene-enter-from,
+.scene-leave-to {
+  opacity: 0;
+  transform: scale(1.015);
+}
+.reduced-motion *,
+.reduced-motion *::before,
+.reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

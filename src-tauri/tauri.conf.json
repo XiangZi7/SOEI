@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "soei",
+  "productName": "SOEI",
   "version": "0.1.0",
   "identifier": "com.admin.soei",
   "build": {
@@ -12,13 +12,18 @@
   "app": {
     "windows": [
       {
-        "title": "soei",
-        "width": 800,
-        "height": 600
+        "label": "main",
+        "title": "SOEI · Music Space",
+        "width": 1440,
+        "height": 960,
+        "minWidth": 600,
+        "minHeight": 520,
+        "decorations": false
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob:; media-src 'self' asset: http://asset.localhost blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src ipc: http://ipc.localhost 'self' ws://localhost:1421",
+      "assetProtocol": { "enable": true, "scope": [] }
     }
   },
   "bundle": {

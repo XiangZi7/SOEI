@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "wallpaper-readonly",
+  "description": "Wallpaper windows consume the shared scene without media or system write access",
+  "windows": ["wallpaper-*"],
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten", "allow-player-snapshot", "allow-scene-track", "allow-settings-load", "allow-wallpaper-status"]
+}

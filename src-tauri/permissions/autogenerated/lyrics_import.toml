@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-lyrics-import"
+description = "Enables the lyrics_import command without any pre-configured scope."
+commands.allow = ["lyrics_import"]
+
+[[permission]]
+identifier = "deny-lyrics-import"
+description = "Denies the lyrics_import command without any pre-configured scope."
+commands.deny = ["lyrics_import"]

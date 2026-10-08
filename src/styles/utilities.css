@@ -1,0 +1,118 @@
+/* 常用语义 class：组件负责布局，共享视觉和控件状态只在这里定义。 */
+@layer components {
+  .icon-button {
+    width: var(--spacing-control);
+    height: var(--spacing-control);
+    display: inline-grid;
+    place-items: center;
+    border-radius: 50%;
+    transition:
+      background var(--motion-hover),
+      color var(--motion-hover);
+  }
+  .icon-button:hover {
+    background: var(--color-hover);
+    color: var(--color-ink);
+  }
+  .quiet-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    min-height: var(--spacing-control);
+    padding: 0 15px;
+    border: 1px solid var(--line);
+    font-size: var(--text-label);
+    letter-spacing: 0.04em;
+    transition: background var(--motion-hover);
+  }
+  .quiet-button:hover {
+    background: var(--color-hover);
+  }
+  .quiet-button.primary {
+    background: var(--color-accent);
+    color: var(--color-surface);
+    border-color: var(--color-accent);
+  }
+  .glass-panel {
+    background: var(--color-glass);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-panel);
+    backdrop-filter: blur(16px);
+  }
+  .eyebrow {
+    margin: 0;
+    font: var(--text-caption) var(--font-serif);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--color-faint);
+  }
+  .field-input,
+  .field-select {
+    background: var(--color-surface);
+    color: var(--color-ink);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-input);
+    min-height: 34px;
+    padding: 6px 10px;
+    font-size: var(--text-label);
+  }
+  .field-input::placeholder {
+    color: var(--color-muted);
+  }
+  .toggle {
+    appearance: none;
+    position: relative;
+    width: 34px;
+    height: 19px;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    background: var(--color-surface);
+    cursor: pointer;
+    transition: background var(--motion-hover);
+  }
+  .toggle::before {
+    content: '';
+    width: 11px;
+    height: 11px;
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    background: var(--color-muted);
+    border-radius: 50%;
+    transition:
+      transform var(--motion-hover),
+      background var(--motion-hover);
+  }
+  .toggle:checked {
+    background: var(--color-accent);
+  }
+  .toggle:checked::before {
+    transform: translateX(15px);
+    background: var(--color-surface);
+  }
+}
+/* 可用于新功能的组合工具类；避免复制 flex / 文字溢出 / 点击区规则。 */
+@utility flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+@utility flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+@utility truncate-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+@utility safe-page {
+  padding-inline: var(--spacing-page);
+}
+@utility touch-target {
+  min-width: 44px;
+  min-height: 44px;
+}
