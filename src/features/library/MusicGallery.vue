@@ -7,6 +7,7 @@ import CoverCard from './CoverCard.vue'
 import Artwork from '../../components/ui/Artwork.vue'
 import type { Track } from '../../types/music'
 const store = useMusicStore()
+defineProps<{ testLoading?: boolean }>()
 const {
   filteredTracks,
   tracks,
@@ -22,6 +23,7 @@ defineEmits<{
   select: [track: Track]
   preview: [track: Track | null]
   import: [directory: boolean]
+  test: []
 }>()
 // 响应式状态
 const state = reactive({
@@ -129,6 +131,31 @@ watch(tab, () => {
             :size="15"
         /></UiButton>
       </div>
+    </div>
+
+    <div
+      class="mb-8 flex flex-wrap items-center justify-between gap-4 rounded-input border border-line bg-surface px-5 py-4"
+    >
+      <div>
+        <p class="text-label text-ink">先听一首，试试歌词</p>
+        <p class="mt-1 text-caption text-muted">
+          36 秒自制旋律 + 同步测试歌词，可暂停、拖动进度
+        </p>
+      </div>
+      <UiButton
+        variant="ghost"
+        class="shrink-0 gap-2 text-accent"
+        :disabled="testLoading"
+        :aria-busy="testLoading"
+        @click="$emit('test')"
+      >
+        <AppIcon
+          :name="testLoading ? 'loader-circle' : 'play'"
+          :size="16"
+          :class="{ 'animate-spin': testLoading }"
+        />
+        {{ testLoading ? '正在准备…' : '播放测试' }}
+      </UiButton>
     </div>
 
     <div

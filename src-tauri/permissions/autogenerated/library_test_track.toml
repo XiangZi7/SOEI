@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-library-test-track"
+description = "Enables the library_test_track command without any pre-configured scope."
+commands.allow = ["library_test_track"]
+
+[[permission]]
+identifier = "deny-library-test-track"
+description = "Denies the library_test_track command without any pre-configured scope."
+commands.deny = ["library_test_track"]

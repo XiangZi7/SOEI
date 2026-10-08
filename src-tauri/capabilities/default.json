@@ -5,7 +5,7 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "allow-library-load", "allow-library-import", "allow-library-cancel", "allow-library-favorite",
+    "allow-library-load", "allow-library-test-track", "allow-library-import", "allow-library-cancel", "allow-library-favorite",
     "allow-player-snapshot", "allow-player-command", "allow-scene-track", "allow-lyrics-import",
     "allow-settings-load", "allow-settings-save", "allow-display-list", "allow-wallpaper-set-enabled",
     "allow-wallpaper-status", "allow-visual-import", "allow-window-action", "allow-shortcuts-set"

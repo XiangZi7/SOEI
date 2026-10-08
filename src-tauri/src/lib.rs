@@ -31,6 +31,7 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::library_load,
+            commands::library_test_track,
             commands::library_import,
             commands::library_cancel,
             commands::library_favorite,

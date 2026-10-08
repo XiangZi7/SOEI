@@ -13,5 +13,7 @@
 | UI 参考图 | 用户提供的 ui稿，public/art/music-space.png 为副本 | 未提供对外分发许可，目前仅为本地开发参考 |
 | 字体 | 系统字体回退：Segoe UI/Microsoft YaHei/Palatino Linotype/Yu Mincho/SimSun 等 | 未嵌入或分发字体文件；实际外观随系统变化 |
 | WAV/LRC/损坏测试文件 | scripts/generate-fixtures.mjs 自行生成 | 不含第三方歌曲，可自由使用这些测试样本 |
+| 一键播放测试旋律与歌词 | scripts/generate-playback-demo.mjs 自行合成与编写，public/demo/soei-test.wav 与 soei-test.lrc | 不含第三方歌曲或歌词，可自由使用 |
+| 一键播放测试封面 | public/demo/soei-test-cover.svg 自行绘制的月光山水矢量图 | 不含第三方图片，可自由使用 |
 
-程序没有附带示例音乐或视频，导入原文件保留在原位置。用户媒体和歌词仅在本地处理。
+程序附带一段自制器乐测试旋律及同步测试歌词，没有附带第三方歌曲或视频；导入原文件保留在原位置。用户媒体和歌词仅在本地处理。

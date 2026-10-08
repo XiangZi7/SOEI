@@ -33,13 +33,15 @@
 
 | 检查 | 实际结果 |
 | --- | --- |
-| pnpm check | 通过：Vue/TS 严格类型、ESLint、Prettier、Vitest 9 项 |
+| pnpm check | 通过：Vue/TS 严格类型、ESLint、Prettier、Vitest 16 项（包含播放与歌词绑定回归） |
 | pnpm build | 通过：Vite 生产构建，组件预览独立分块 |
 | pnpm tauri build --no-bundle | 通过：Release 可执行文件 src-tauri/target/release/soei.exe；未生成正式安装包 |
+| pnpm tauri build --debug --no-bundle | 一键测试版通过：src-tauri/target/debug/soei.exe，附带可离线播放的测试旋律与 LRC |
 | Rust cargo check / fmt | 通过 |
-| Rust 单元测试 | 5 项通过：队列模式、WAV 解码/前后 Seek/能量、Unicode 路径索引/同名歌词/损坏文件、迁移/设置往返、拒绝新版数据库 |
+| Rust 单元测试 | 6 项通过：内置测试素材导出/36 秒音频索引/同名 LRC、队列模式、WAV 解码/前后 Seek/能量、Unicode 路径索引/同名歌词/损坏文件、迁移/设置往返、拒绝新版数据库 |
 | 原生设备测试 | native_output_seek_pause_resume 单独执行通过：零音量输出、位置推进、暂停保持、继续、前后 Seek、停止清理 |
 | 浏览器 | 搜索 Purity、收藏、设置开关、进入/返回场景、隐藏控制层键盘访问、测试 WAV 导入/实际进度/暂停/键盘 Seek |
+| 一键播放与歌词 | 浏览器实测：点击播放测试、实际时间推进与歌词切换、暂停、跳到 24.5 秒对应歌词、回到 1 秒首句；原生设备测试使用同一段 36 秒 WAV 并通过 |
 | 组件预览 | 输入、选择、开关和按钮状态正常；模态焦点限制、Esc、关闭后焦点恢复通过 |
 | 响应式 | 1440×960、600×720 和当前侧栏宽度下画廊及组件页面可用 |
 
@@ -48,6 +50,8 @@
 ![UI 组件库](screenshots/ui-library.png)
 
 测试素材为自行生成的 12 秒、8 kHz、单声道 PCM16 WAV（测试音楽.wav），配套中日英 LRC。损坏.mp3 为故意无效的文件，没有第三方歌曲。
+
+一键试听素材为 `public/demo/soei-test.wav`：36 秒、22.05 kHz、单声道 PCM16 自制器乐旋律，配套 9 句同步测试歌词（无演唱）及原创 SVG 封面。浏览器同名 LRC 自动关联及单曲歌词绑定均限当前会话；桌面版将测试音频/LRC 保存到应用数据目录并使用原生播放服务。
 
 ## 验收对应与下一阶段
 

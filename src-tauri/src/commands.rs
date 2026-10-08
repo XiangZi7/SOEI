@@ -20,6 +20,26 @@ pub fn library_load(window: WebviewWindow, state: State<AppState>) -> AppResult<
     state.storage.tracks()
 }
 #[tauri::command]
+pub fn library_test_track(
+    window: WebviewWindow,
+    app: AppHandle,
+    state: State<AppState>,
+) -> AppResult<Track> {
+    main_only(&window)?;
+    let directory = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| AppError::new("TEST_TRACK", error))?
+        .join("playback-test");
+    let mut track = library::create_test_track(&directory, &state.cache_dir)?;
+    if let Ok(existing) = state.storage.track(&track.id) {
+        track.favorite = existing.favorite;
+        track.last_played = existing.last_played;
+    }
+    state.storage.save_track(&track)?;
+    Ok(track)
+}
+#[tauri::command]
 pub async fn library_import(
     window: WebviewWindow,
     app: AppHandle,

@@ -42,6 +42,8 @@ const state = reactive({
   controlsVisible: true,
   // 控制层鼠标悬停状态
   controlsHovered: false,
+  // 测试曲目正在加载
+  testLoading: false,
   // 聚焦封面的环境颜色
   ambientColor: 'var(--color-ambient-default)',
 })
@@ -56,6 +58,7 @@ const {
   controlsVisible,
   ambientColor,
   controlsHovered,
+  testLoading,
 } = toRefs(state)
 const musicInput = useTemplateRef<HTMLInputElement>('musicInput')
 const lyricInput = useTemplateRef<HTMLInputElement>('lyricInput')
@@ -69,23 +72,45 @@ function importMusic(directory = false) {
   if (desktop) void store.importMusic(directory)
   else musicInput.value?.click()
 }
-function filesSelected(event: Event) {
+async function filesSelected(event: Event) {
   const input = event.target as HTMLInputElement
-  store.importBrowserFiles(input.files)
-  input.value = ''
+  try {
+    await store.importBrowserFiles(input.files)
+  } catch (error) {
+    store.report(error)
+  } finally {
+    input.value = ''
+  }
 }
 async function lyricsSelected(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
-  if (file) {
-    store.lyricText = await file.text()
-    store.notice = '歌词已导入'
+  const id = store.activeTrack?.id
+  try {
+    if (file && id) await store.importBrowserLyrics(file, id)
+  } catch (error) {
+    store.report(error)
+  } finally {
+    input.value = ''
   }
-  input.value = ''
 }
 function importLyrics() {
   if (desktop) void store.importLyrics()
   else lyricInput.value?.click()
+}
+async function playTest() {
+  if (state.testLoading) return
+  state.testLoading = true
+  try {
+    const track = await store.preparePlaybackTest()
+    if (!track) return
+    await select(track)
+    if (store.snapshot.trackId === track.id && !store.error) {
+      store.notice = '36 秒自制旋律与同步测试歌词 · 可暂停或拖动进度'
+    }
+  } finally {
+    state.testLoading = false
+  }
 }
 async function select(track: Track) {
   await store.select(track)
@@ -299,9 +324,11 @@ onBeforeUnmount(() => {
           /></div
       ></Transition>
       <MusicGallery
+        :test-loading="testLoading"
         @select="select"
         @preview="preview"
         @import="importMusic"
+        @test="playTest"
       />
     </div>
     <Transition name="scene"
@@ -428,7 +455,7 @@ onBeforeUnmount(() => {
       class="sr-only"
       tabindex="-1"
       type="file"
-      accept="audio/*,.mp3,.flac,.wav,.ogg,.m4a,.aac"
+      accept="audio/*,.mp3,.flac,.wav,.ogg,.m4a,.aac,.lrc"
       multiple
       @change="filesSelected"
     />

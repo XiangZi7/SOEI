@@ -7,13 +7,13 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "tauri": "tauri",
+    "tauri": "node scripts/tauri.mjs",
     "typecheck": "vue-tsc --noEmit",
-    "lint": "eslint src *.ts *.mjs",
+    "lint": "eslint src *.ts *.mjs scripts/tauri.mjs",
     "test": "vitest run",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm format:check",
-    "format": "prettier --write src vite.config.ts vitest.config.ts eslint.config.mjs",
-    "format:check": "prettier --check src vite.config.ts vitest.config.ts eslint.config.mjs"
+    "format": "prettier --write src vite.config.ts vitest.config.ts eslint.config.mjs scripts/tauri.mjs",
+    "format:check": "prettier --check src vite.config.ts vitest.config.ts eslint.config.mjs scripts/tauri.mjs"
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.141",

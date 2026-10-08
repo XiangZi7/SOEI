@@ -3,6 +3,10 @@ import { defineStore } from 'pinia'
 import { call, desktop, errorMessage, onNative } from '../bridge/native'
 import { demoTracks } from '../features/library/demo'
 import { parseLrc } from '../features/lyrics/lrc'
+import {
+  playbackTestLyrics,
+  playbackTestTrack,
+} from '../features/player/testTrack'
 import type {
   Display,
   LibraryTab,
@@ -117,6 +121,8 @@ export const useMusicStore = defineStore('music', () => {
   const audio = desktop ? null : new Audio()
   const cleanups: (() => void)[] = []
   const objectUrls: string[] = []
+  const browserLyrics = new Map<string, string>()
+  const browserSidecars = new Map<string, { text: string; name: string }>()
   let lyricRequest = 0
   let saveTimer: ReturnType<typeof setTimeout> | undefined
   let lastSaved = ''
@@ -213,7 +219,7 @@ export const useMusicStore = defineStore('music', () => {
         if (request !== lyricRequest) return
         upsert(track)
         state.lyricText = text ?? ''
-      }
+      } else state.lyricText = browserLyrics.get(id) ?? ''
     } catch (error) {
       if (request === lyricRequest) report(error)
     }
@@ -292,6 +298,11 @@ export const useMusicStore = defineStore('music', () => {
         if (request !== playRequest) return
         state.snapshot.trackId = track.id
         state.snapshot.sessionId += 1
+        state.snapshot.positionMs = Math.round(audio.currentTime * 1000)
+        state.snapshot.durationMs = Number.isFinite(audio.duration)
+          ? Math.round(audio.duration * 1000)
+          : track.durationMs
+        state.snapshot.status = audio.paused ? 'paused' : 'playing'
         track.lastPlayed = Date.now() / 1000
       } else if (action === 'toggle') {
         if (!state.snapshot.trackId) return
@@ -300,12 +311,13 @@ export const useMusicStore = defineStore('music', () => {
       } else if (action === 'volume') {
         state.snapshot.volume = Math.max(0, Math.min(1, Number(args.value)))
         audio.volume = state.snapshot.volume
-      } else if (action === 'seek' && Number.isFinite(audio.duration))
+      } else if (action === 'seek' && Number.isFinite(audio.duration)) {
         audio.currentTime = Math.min(
           audio.duration,
           Math.max(0, Number(args.value) / 1000)
         )
-      else if (action === 'repeat')
+        state.snapshot.positionMs = Math.round(audio.currentTime * 1000)
+      } else if (action === 'repeat')
         state.snapshot.repeatMode = String(args.mode)
       else if (action === 'queue') {
         state.snapshot.queue = args.queue as string[]
@@ -344,6 +356,31 @@ export const useMusicStore = defineStore('music', () => {
     await command('queue', { queue: ids })
     state.preferences.queue = ids
   }
+  async function preparePlaybackTest(): Promise<Track | null> {
+    state.error = ''
+    try {
+      if (desktop) {
+        const track = await call<Track>('library_test_track')
+        upsert(track)
+        if (state.snapshot.trackId === track.id) await loadLyrics(track.id)
+        return track
+      }
+      const existing = state.realTracks.find(
+        track => track.id === playbackTestTrack.id
+      )
+      const track = existing ?? { ...playbackTestTrack }
+      upsert(track)
+      attachBrowserLyrics(
+        track.id,
+        playbackTestLyrics,
+        playbackTestTrack.lyricRef!
+      )
+      return track
+    } catch (error) {
+      report(error)
+      return null
+    }
+  }
   async function favorite(track: Track) {
     try {
       if (track.demo) {
@@ -371,9 +408,29 @@ export const useMusicStore = defineStore('music', () => {
       report(error)
     }
   }
-  function importBrowserFiles(files: FileList | null) {
+  function sidecarKey(name: string) {
+    return name
+      .replace(/\.[^.]+$/, '')
+      .normalize('NFC')
+      .toLocaleLowerCase()
+  }
+  function attachBrowserLyrics(id: string, text: string, name: string) {
+    browserLyrics.set(id, text)
+    const track = state.realTracks.find(track => track.id === id)
+    if (track) track.lyricRef = name
+    if (state.snapshot.trackId === id) {
+      ++lyricRequest
+      state.lyricText = text
+    }
+  }
+  async function importBrowserFiles(files: FileList | null) {
     if (!files) return
-    for (const file of files) {
+    const selected = Array.from(files)
+    for (const file of selected.filter(file => /\.lrc$/i.test(file.name))) {
+      const text = await file.text()
+      browserSidecars.set(sidecarKey(file.name), { text, name: file.name })
+    }
+    for (const file of selected) {
       if (!/\.(mp3|flac|wav|ogg|m4a|aac)$/i.test(file.name)) continue
       const id = `${file.name}:${file.size}:${file.lastModified}`
       if (state.realTracks.some(track => track.id === id)) continue
@@ -392,7 +449,18 @@ export const useMusicStore = defineStore('music', () => {
         lastPlayed: null,
       })
     }
-    state.notice = '音乐已导入本次预览'
+    for (const track of state.realTracks) {
+      const sidecar = browserSidecars.get(
+        track.title.normalize('NFC').toLocaleLowerCase()
+      )
+      if (sidecar) attachBrowserLyrics(track.id, sidecar.text, sidecar.name)
+    }
+    state.notice = '音乐与同名歌词已导入本次预览'
+  }
+  async function importBrowserLyrics(file: File, id: string) {
+    const text = await file.text()
+    attachBrowserLyrics(id, text, file.name)
+    state.notice = `已导入 ${parseLrc(text).length} 句歌词`
   }
   async function importLyrics() {
     if (!activeTrack.value) return
@@ -466,9 +534,11 @@ export const useMusicStore = defineStore('music', () => {
     select,
     command,
     setQueue,
+    preparePlaybackTest,
     favorite,
     importMusic,
     importBrowserFiles,
+    importBrowserLyrics,
     importLyrics,
     refreshDisplays,
     setWallpaper,

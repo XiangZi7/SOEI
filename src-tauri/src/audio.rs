@@ -504,7 +504,7 @@ mod tests {
         let sink = Sink::connect_new(stream.mixer());
         sink.set_volume(0.0);
         let path =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/测试音楽.wav");
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../public/demo/soei-test.wav");
         sink.append(Decoder::try_from(File::open(path).unwrap()).unwrap());
         std::thread::sleep(Duration::from_millis(180));
         assert!(!sink.empty());

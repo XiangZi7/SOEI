@@ -2,6 +2,7 @@ fn main() {
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
             "library_load",
+            "library_test_track",
             "library_import",
             "library_cancel",
             "library_favorite",

@@ -193,9 +193,56 @@ pub fn read_lyrics(track: &Track) -> AppResult<Option<String>> {
     })
 }
 
+pub fn create_test_track(directory: &Path, cache: &Path) -> AppResult<Track> {
+    std::fs::create_dir_all(directory)?;
+    let audio = directory.join("soei-test.wav");
+    let wav = include_bytes!("../../public/demo/soei-test.wav").as_slice();
+    if std::fs::read(&audio).ok().as_deref() != Some(wav) {
+        std::fs::write(&audio, wav)?;
+    }
+    let lyric_path = audio.with_extension("lrc");
+    let lyrics = include_bytes!("../../public/demo/soei-test.lrc").as_slice();
+    if std::fs::read(&lyric_path).ok().as_deref() != Some(lyrics) {
+        std::fs::write(&lyric_path, lyrics)?;
+    }
+    let mut track = read_track(&audio, cache)?;
+    track.title = "光的回声 · 播放测试".into();
+    track.artist = "SOEI".into();
+    track.album = "播放与歌词测试".into();
+    track.cover_ref = Some("/demo/soei-test-cover.svg".into());
+    Ok(track)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn bundled_playback_test_has_audio_and_sidecar() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "soei-playback-test-{}-{unique}",
+            std::process::id()
+        ));
+        let track = create_test_track(&directory, &directory).expect("create bundled test");
+        assert_eq!(track.duration_ms, 36_000);
+        assert_eq!(track.title, "光的回声 · 播放测试");
+        let text = read_lyrics(&track).unwrap().unwrap();
+        assert!(text.contains("[00:24.00]拖动进度，找到这一句"));
+        assert_eq!(
+            text.lines().filter(|line| line.starts_with("[00:")).count(),
+            9
+        );
+        assert_eq!(
+            create_test_track(&directory, &directory).unwrap().id,
+            track.id
+        );
+        std::fs::remove_file(&track.local_path).unwrap();
+        std::fs::remove_file(track.lyric_ref.unwrap()).unwrap();
+        std::fs::remove_dir(directory).unwrap();
+    }
     #[test]
     fn unicode_file_index_and_sidecar() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures");

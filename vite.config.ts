@@ -12,16 +12,15 @@ export default defineConfig(() => ({
   //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
+  // 2. try the next port when occupied; the Tauri launcher uses the actual URL
   server: {
     port: 1420,
-    strictPort: true,
+    strictPort: false,
     host: host || false,
-    hmr: host
+    ws: host
       ? {
           protocol: 'ws',
           host,
-          port: 1421,
         }
       : undefined,
     watch: {
