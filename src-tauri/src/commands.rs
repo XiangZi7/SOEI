@@ -302,7 +302,12 @@ pub async fn visual_import(window: WebviewWindow, app: AppHandle) -> AppResult<O
     .map_err(|error| AppError::new("BACKGROUND", error))?
 }
 #[tauri::command]
-pub fn window_action(window: WebviewWindow, app: AppHandle, action: String) -> AppResult<()> {
+pub fn window_action(
+    window: WebviewWindow,
+    app: AppHandle,
+    action: String,
+    reduced_motion: Option<bool>,
+) -> AppResult<()> {
     control_window(&window)?;
     let window = if window.label() == "settings" && action == "borderless" {
         app.get_webview_window("main")
@@ -318,6 +323,14 @@ pub fn window_action(window: WebviewWindow, app: AppHandle, action: String) -> A
         "restore-player" => {
             main_only(&window)?;
             return app.state::<AppState>().window_mode.restore(&window);
+        }
+        "hide-wallpaper-player" | "show-wallpaper-player" => {
+            main_only(&window)?;
+            return app.state::<AppState>().window_mode.set_hidden(
+                &window,
+                action == "hide-wallpaper-player",
+                reduced_motion.unwrap_or(false),
+            );
         }
         "minimize" => window.minimize(),
         "maximize" => {

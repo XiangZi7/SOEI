@@ -120,6 +120,38 @@ describe('设置子窗口与主窗口共享状态', () => {
     ).toHaveLength(1)
   })
 
+  it('未保存关闭行为时默认使用托盘，并随设置一起持久化', async () => {
+    await store.initialize('settings')
+    expect(store.preferences.closeToTray).toBe(true)
+    store.preferences.showTitles = true
+    await nextTick()
+    expect(await store.flushPreferences()).toBe(true)
+    expect(native.call).toHaveBeenCalledWith('settings_save', {
+      value: expect.objectContaining({ closeToTray: true }),
+    })
+  })
+
+  it('保留已保存的直接退出选择，其他设置更新不会重新开启托盘', async () => {
+    const invoke = native.call.getMockImplementation()!
+    native.call.mockImplementation((command: string) =>
+      command === 'settings_load'
+        ? Promise.resolve({ closeToTray: false })
+        : invoke(command)
+    )
+    await store.initialize('settings')
+    expect(store.preferences.closeToTray).toBe(false)
+    native.handlers.get('settings:changed')?.({
+      ...store.preferences,
+      layout: 'title',
+    })
+    store.preferences.showTitles = true
+    await nextTick()
+    expect(await store.flushPreferences()).toBe(true)
+    expect(native.call).toHaveBeenCalledWith('settings_save', {
+      value: expect.objectContaining({ closeToTray: false, layout: 'title' }),
+    })
+  })
+
   it('来自另一个窗口的配置立即同步，不会回写造成循环', async () => {
     await store.initialize('settings')
     native.handlers.get('settings:changed')?.({

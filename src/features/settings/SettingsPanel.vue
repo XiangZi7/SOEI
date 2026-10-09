@@ -127,7 +127,7 @@ async function applyShortcuts(clear = false) {
           /></SettingRow>
           <SettingRow
             title="关闭时隐藏到托盘"
-            hint="开启后，关闭主窗口会保留音乐。可从托盘菜单退出。"
+            hint="默认关闭窗口后继续播放，可从托盘菜单退出应用。"
             ><UiSwitch
               v-model="preferences.closeToTray"
               label="关闭时隐藏到托盘"

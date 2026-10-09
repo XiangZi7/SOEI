@@ -25,7 +25,7 @@ export const defaultPreferences: Preferences = {
   lyricSize: 42,
   lyricOffset: 0,
   quality: 'balanced',
-  closeToTray: false,
+  closeToTray: true,
   background: '',
   language: 'zh-CN',
   playlists: [],

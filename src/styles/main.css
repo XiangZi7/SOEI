@@ -14,6 +14,11 @@
     color-scheme: dark;
   }
   :root.wallpaper-player-active {
+    overflow: hidden;
+    background: transparent;
+  }
+  :root.wallpaper-player-active body {
+    overflow: hidden;
     background: transparent;
   }
   * {

@@ -35,7 +35,6 @@ const { activeTrack, previewTrack, preferences, error, notice, scan } =
   storeToRefs(store)
 const backgroundTrack = computed(() => activeTrack.value ?? previewTrack.value)
 const wallpaperPlayer = computed(() => store.wallpaper.enabled.length > 0)
-useWallpaperPlayerWindow(wallpaperPlayer, store.report)
 // 响应式状态
 const state = reactive({
   // 沉浸场景开关
@@ -79,6 +78,17 @@ const {
   controlsHovered,
   testLoading,
 } = toRefs(state)
+const { hidden: wallpaperPlayerHidden, reveal: revealWallpaperPlayer } =
+  useWallpaperPlayerWindow(wallpaperPlayer, store.report, {
+    keepOpen: computed(
+      () =>
+        state.settingsOpen ||
+        state.wallpaperOpen ||
+        state.searchOpen ||
+        state.queueOpen
+    ),
+    reducedMotion: computed(() => preferences.value.reducedMotion),
+  })
 const musicInput = useTemplateRef<HTMLInputElement>('musicInput')
 const lyricInput = useTemplateRef<HTMLInputElement>('lyricInput')
 let hideTimer: ReturnType<typeof setTimeout> | undefined
@@ -430,6 +440,8 @@ onBeforeUnmount(() => {
     ></Transition>
     <WallpaperPlayer
       v-if="wallpaperPlayer"
+      :hidden="wallpaperPlayerHidden"
+      @reveal="revealWallpaperPlayer"
       @queue="queueOpen = !queueOpen"
       @wallpaper="openWallpaper"
       @settings="settings('visual')"

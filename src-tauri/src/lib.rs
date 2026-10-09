@@ -4,6 +4,7 @@ mod library;
 mod model;
 mod storage;
 mod wallpaper;
+mod window_dock;
 mod window_mode;
 
 use std::{path::PathBuf, sync::atomic::AtomicBool};
@@ -133,7 +134,7 @@ pub fn run() {
                         .and_then(|value| {
                             value.get("closeToTray").and_then(|value| value.as_bool())
                         })
-                        .unwrap_or(false);
+                        .unwrap_or(true);
                     if hide {
                         api.prevent_close();
                         let _ = window.hide();
@@ -154,8 +155,13 @@ pub fn run() {
 }
 fn show_main(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
+        let _ = app
+            .state::<AppState>()
+            .window_mode
+            .set_hidden(&window, false, true);
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
+        let _ = window.emit("wallpaper-player:revealed", ());
     }
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, useTemplateRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMusicStore } from '../../stores/music'
 import { call, desktop } from '../../bridge/native'
@@ -9,7 +9,15 @@ import PlaybackSeekBar from '../player/PlaybackSeekBar.vue'
 import PlaybackTransport from '../player/PlaybackTransport.vue'
 import { lyricIndexAt } from '../lyrics/lrc'
 
-defineEmits<{ queue: []; wallpaper: []; settings: []; restore: [] }>()
+defineProps<{ hidden?: boolean }>()
+const emit = defineEmits<{
+  queue: []
+  wallpaper: []
+  settings: []
+  restore: []
+  reveal: []
+}>()
+const player = useTemplateRef<HTMLElement>('player')
 const store = useMusicStore()
 const { activeTrack, lyrics, snapshot, preferences } = storeToRefs(store)
 const lyricIndex = computed(() =>
@@ -27,20 +35,46 @@ const seek = (positionMs: number) =>
 function windowAction(action: string) {
   if (desktop) void call('window_action', { action }).catch(store.report)
 }
+function revealFromKeyboard() {
+  emit('reveal')
+  void nextTick(() => {
+    player.value
+      ?.querySelector<HTMLButtonElement>('.compact-actions button')
+      ?.focus()
+  })
+}
 </script>
 
 <template>
   <section
+    ref="player"
     class="wallpaper-player"
+    :class="{ 'is-retracted': hidden }"
     aria-label="壁纸模式播放器"
   >
+    <button
+      v-if="hidden"
+      class="wallpaper-edge"
+      type="button"
+      aria-label="展开壁纸播放器"
+      aria-expanded="false"
+      title="展开播放器"
+      @click="$emit('reveal')"
+      @focus="revealFromKeyboard"
+    >
+      <span
+        class="wallpaper-edge-grip"
+        aria-hidden="true"
+      />
+    </button>
     <CoverComposition
       compact
+      :inert="hidden"
+      :aria-hidden="hidden || undefined"
       :track="activeTrack"
       :lines="lyrics"
       :index="lyricIndex"
       :energy="snapshot.status === 'playing' ? snapshot.energy : []"
-      @drag="windowAction('drag')"
     >
       <template #leading>
         <div class="compact-actions">
@@ -75,7 +109,7 @@ function windowAction(action: string) {
           <UiIconButton
             icon="x"
             :icon-size="12"
-            label="关闭窗口"
+            :label="preferences.closeToTray ? '隐藏到系统托盘' : '关闭窗口'"
             @click="windowAction('close')"
           />
         </div>
@@ -104,6 +138,44 @@ function windowAction(action: string) {
   position: fixed;
   inset: 0;
   z-index: var(--z-scene);
+  overflow: hidden;
+  border-radius: 0;
+}
+.wallpaper-player :deep(.cover-composition) {
+  border: 0;
+  border-radius: 0;
+  background:
+    radial-gradient(ellipse at 0 0, #dfe9dd29, transparent 60%),
+    linear-gradient(120deg, #26322d80, #111b168f 64%, #25312b80);
+  box-shadow: inset 1px 1px #ffffff1c;
+  backdrop-filter: blur(32px) saturate(1.35);
+  transition: transform 180ms cubic-bezier(0.333333, 1, 0.666667, 1);
+}
+.wallpaper-player.is-retracted :deep(.cover-composition) {
+  transform: translateX(calc(100% - 12px));
+}
+.wallpaper-player :deep(.cover-chrome) {
+  cursor: default;
+}
+.wallpaper-edge {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  border-radius: 0;
+  background: #b7c6b92e;
+  box-shadow: inset 1px 0 #e1e8dc59;
+}
+.wallpaper-edge-grip {
+  width: 2px;
+  height: 34px;
+  background: #d4decbb3;
+}
+.wallpaper-edge:focus-visible {
+  outline-offset: -2px;
 }
 .compact-actions {
   display: flex;

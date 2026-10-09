@@ -31,8 +31,10 @@ describe('壁纸播放器同步真实歌曲', () => {
     store.dispose()
     store.$dispose()
   })
-  const render = () =>
-    renderToString(createSSRApp({ render: () => h(WallpaperPlayer) }))
+  const render = (hidden = false) =>
+    renderToString(
+      createSSRApp({ render: () => h(WallpaperPlayer, { hidden }) })
+    )
 
   it('手书模式下也显示双栏播放器与真实播放时间，不修改桌面场景', async () => {
     store.preferences.layout = 'manuscript'
@@ -55,5 +57,15 @@ describe('壁纸播放器同步真实歌曲', () => {
     expect(await render()).toContain('前奏 · 故事即将开始')
     store.lyricText = ''
     expect(await render()).toContain('暂无歌词')
+  })
+
+  it('收起时保留展开入口，隐藏的播放控件不参与键盘导航', async () => {
+    const html = await render(true)
+    expect(html).toContain('is-retracted')
+    expect(html).toContain('aria-label="展开壁纸播放器"')
+    expect(html).toMatch(
+      /cover-composition compact[^>]*inert[^>]*aria-hidden="true"/
+    )
+    expect(html).toContain('隐藏到系统托盘')
   })
 })
