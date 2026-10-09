@@ -187,6 +187,60 @@ describe('设置子窗口与主窗口共享状态', () => {
     expect(store.activeTrack?.lyricRef).toBe('new.lrc')
   })
 
+  it('导入歌词期间切歌，导入结果不会覆盖新歌曲的歌词', async () => {
+    await store.initialize('settings')
+    await nextTick()
+    let finishImport!: (text: string | null) => void
+    native.call.mockImplementationOnce(
+      () =>
+        new Promise<string | null>(resolve => {
+          finishImport = resolve
+        })
+    )
+    const importing = store.importLyrics()
+    expect(native.call).toHaveBeenLastCalledWith('lyrics_import', {
+      id: track.id,
+    })
+
+    const nextTrack = { ...track, id: 'next', title: '下一首歌' }
+    native.call.mockResolvedValueOnce([nextTrack, '[00:00]下一首歌的歌词'])
+    native.handlers.get('player:state')?.({
+      ...store.snapshot,
+      revision: 2,
+      sessionId: 2,
+      trackId: nextTrack.id,
+      positionMs: 0,
+    })
+    await nextTick()
+    expect(store.lyrics[0]?.text).toBe('下一首歌的歌词')
+
+    finishImport('[00:00]原歌曲新导入的歌词')
+    await importing
+    expect(store.activeTrack?.id).toBe(nextTrack.id)
+    expect(store.lyrics[0]?.text).toBe('下一首歌的歌词')
+  })
+
+  it('成功导入歌词后，较早发起的后台读取不会覆盖新歌词', async () => {
+    await store.initialize('settings')
+    await nextTick()
+    let finishLoad!: (value: [Track, string | null]) => void
+    native.call.mockImplementationOnce(
+      () =>
+        new Promise<[Track, string | null]>(resolve => {
+          finishLoad = resolve
+        })
+    )
+    native.handlers.get('library:track')?.({ ...track, lyricRef: 'old.lrc' })
+
+    native.call.mockResolvedValueOnce('[00:00]新导入的歌词')
+    await store.importLyrics()
+    expect(store.lyrics[0]?.text).toBe('新导入的歌词')
+
+    finishLoad([{ ...track, lyricRef: 'old.lrc' }, '[00:00]较早读取的歌词'])
+    await nextTick()
+    expect(store.lyrics[0]?.text).toBe('新导入的歌词')
+  })
+
   it('保存失败会返回失败并保留修改，允许用户重试关闭', async () => {
     await store.initialize('settings')
     store.preferences.showTitles = true

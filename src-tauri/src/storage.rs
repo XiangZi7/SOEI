@@ -60,6 +60,22 @@ impl Storage {
             params![track.id, track.local_path, data])?;
         Ok(())
     }
+    pub fn update_last_played(&self, id: &str, last_played: Option<u64>) -> AppResult<Track> {
+        let connection = self
+            .0
+            .lock()
+            .map_err(|_| AppError::new("DATABASE", "数据库锁失效"))?;
+        // 队列和历史中的 Track 可能已过时，只修改播放时间并返回数据库中的最新记录。
+        let data: Option<String> = connection
+            .query_row(
+                "UPDATE tracks SET data=json_set(data, '$.lastPlayed', json(?2)) WHERE id=?1 RETURNING data",
+                params![id, serde_json::json!(last_played).to_string()],
+                |row| row.get(0),
+            )
+            .optional()?;
+        serde_json::from_str(&data.ok_or_else(|| AppError::new("TRACK_MISSING", "音乐记录不存在"))?)
+            .map_err(|error| AppError::new("DATABASE_DATA", error))
+    }
     pub fn settings(&self) -> AppResult<serde_json::Value> {
         let connection = self
             .0
@@ -111,5 +127,15 @@ mod tests {
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
         assert_eq!(version, 2);
+    }
+    #[test]
+    fn playback_update_does_not_recreate_a_missing_track() -> AppResult<()> {
+        let connection = Connection::open_in_memory()?;
+        Storage::migrate(&connection)?;
+        let store = Storage(Mutex::new(connection));
+        let error = store.update_last_played("missing", Some(123)).unwrap_err();
+        assert_eq!(error.code, "TRACK_MISSING");
+        assert!(store.tracks()?.is_empty());
+        Ok(())
     }
 }

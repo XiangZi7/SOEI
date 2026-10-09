@@ -4,11 +4,12 @@ import { storeToRefs } from 'pinia'
 import {
   useDocumentVisibility,
   useElementVisibility,
-  useIntervalFn,
+  useRafFn,
   usePreferredReducedMotion,
 } from '@vueuse/core'
 import { useMusicStore } from '../../stores/music'
 import { lyricIndexAt } from '../lyrics/lrc'
+import { useLyricClock } from '../lyrics/useLyricClock'
 import SceneBackdrop from './SceneBackdrop.vue'
 import LyricStage from './LyricStage.vue'
 import { previewLyrics, sceneModes } from './sceneModes'
@@ -30,9 +31,10 @@ const systemMotion = usePreferredReducedMotion()
 const scene = useTemplateRef<HTMLElement>('scene')
 const visible = useElementVisibility(scene)
 const documentVisibility = useDocumentVisibility()
+// 响应式状态
 const state = reactive({
   // 视觉预览独立循环，不修改播放进度或真实歌词。
-  previewIndex: 1,
+  previewPositionMs: 4000,
 })
 const track = computed(() =>
   props.preview ? previewTrack.value : activeTrack.value
@@ -56,24 +58,34 @@ const animated = computed(
     documentVisibility.value === 'visible'
 )
 const lines = computed(() => (props.preview ? previewLyrics : lyrics.value))
-const lyricIndex = computed(() =>
-  props.preview
-    ? state.previewIndex
-    : lyricIndexAt(
-        lyrics.value,
-        snapshot.value.positionMs +
-          preferences.value.lyricOffset +
-          (track.value
-            ? (preferences.value.trackOffsets[track.value.id] ?? 0)
-            : 0)
-      )
+const { positionMs: playbackPositionMs } = useLyricClock(
+  () => snapshot.value,
+  () =>
+    !props.preview &&
+    visible.value &&
+    !reducedMotion.value &&
+    preferences.value.quality !== 'power'
 )
-const { pause, resume } = useIntervalFn(
-  () => {
-    state.previewIndex = (state.previewIndex + 1) % previewLyrics.length
+const lyricPositionMs = computed(() =>
+  props.preview
+    ? state.previewPositionMs
+    : playbackPositionMs.value +
+      preferences.value.lyricOffset +
+      (track.value ? (preferences.value.trackOffsets[track.value.id] ?? 0) : 0)
+)
+const lyricIndex = computed(() =>
+  lyricIndexAt(lines.value, lyricPositionMs.value)
+)
+const previewDurationMs = previewLyrics.length * 4000
+const { pause, resume } = useRafFn(
+  ({ delta }) => {
+    state.previewPositionMs =
+      (state.previewPositionMs + Math.min(100, delta)) % previewDurationMs
   },
-  4000,
-  { immediate: false }
+  {
+    immediate: false,
+    fpsLimit: () => (preferences.value.quality === 'high' ? 60 : 30),
+  }
 )
 watch(
   () =>
@@ -173,6 +185,8 @@ function volume(event: Event) {
       :track="track"
       :lines="lines"
       :index="lyricIndex"
+      :position-ms="lyricPositionMs"
+      :duration-ms="preview ? previewDurationMs : snapshot.durationMs"
       :layout="preferences.layout"
       :seed="preferences.sceneSeed"
       :animated="animated"

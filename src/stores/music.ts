@@ -508,13 +508,15 @@ export const useMusicStore = defineStore('music', () => {
     state.notice = `已导入 ${parseLrc(text).length} 句歌词`
   }
   async function importLyrics() {
-    if (!activeTrack.value) return
+    const id = activeTrack.value?.id
+    if (!id) return
     try {
-      const text = await call<string | null>('lyrics_import', {
-        id: activeTrack.value.id,
-      })
+      const text = await call<string | null>('lyrics_import', { id })
       if (text !== null) {
-        state.lyricText = text
+        if (state.snapshot.trackId === id) {
+          ++lyricRequest
+          state.lyricText = text
+        }
         state.notice = `已导入 ${parseLrc(text).length} 句歌词`
       }
     } catch (error) {

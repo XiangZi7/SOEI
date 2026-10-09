@@ -114,6 +114,15 @@ watch(
           ]"
           :data-enter-x="fragment.direction.x"
           :data-enter-y="fragment.direction.y"
+          :style="
+            fragment.card && fragment.emphasis
+              ? {
+                  '--lyric-fill-color': 'var(--color-stage)',
+                  '--lyric-rest-color':
+                    'color-mix(in srgb, var(--color-stage) 50%, transparent)',
+                }
+              : undefined
+          "
         >
           <span
             v-for="(glyph, glyphIndex) in fragment.glyphs"
@@ -163,3 +172,15 @@ watch(
     </div>
   </div>
 </template>
+
+<style scoped>
+.lyric-glyph[data-timed] {
+  background-image: linear-gradient(
+    90deg,
+    var(--lyric-fill-color, var(--color-stage-gold)) var(--lyric-fill, 0%),
+    var(--lyric-rest-color, var(--color-stage-muted)) var(--lyric-fill, 0%)
+  );
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+</style>

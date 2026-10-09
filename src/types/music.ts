@@ -35,10 +35,16 @@ export interface PlaybackSnapshot {
   energy: number[]
   error: string | null
 }
+export interface LyricWord {
+  text: string
+  startMs: number
+  endMs?: number
+}
 export interface LyricLine {
   id: string
   startMs: number
   text: string
+  words?: LyricWord[]
 }
 export type LibraryTab = 'all' | 'albums' | 'artists' | 'playlists'
 export type SceneLayout =

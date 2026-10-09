@@ -230,7 +230,11 @@ mod tests {
         assert_eq!(track.duration_ms, 36_000);
         assert_eq!(track.title, "光的回声 · 播放测试");
         let text = read_lyrics(&track).unwrap().unwrap();
-        assert!(text.contains("[00:24.00]拖动进度，找到这一句"));
+        assert!(text.contains("[00:24.00]<00:24.00>拖动进度，"));
+        assert_eq!(
+            text.as_bytes(),
+            include_bytes!("../../public/demo/soei-test.lrc")
+        );
         assert_eq!(
             text.lines().filter(|line| line.starts_with("[00:")).count(),
             9

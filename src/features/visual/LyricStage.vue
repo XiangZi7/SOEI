@@ -4,13 +4,15 @@ import KineticLyrics from './KineticLyrics.vue'
 import CoverComposition from './CoverComposition.vue'
 import type { LyricLine, SceneLayout, Track } from '../../types/music'
 import Artwork from '../../components/ui/Artwork.vue'
-import { isKineticLayout } from './lyricStoryboard'
+import { isKineticLayout, shotVariant } from './lyricStoryboard'
 import { useLyricTransitions } from './useLyricTransitions'
 
 const props = defineProps<{
   track: Track | null
   lines: LyricLine[]
   index: number
+  positionMs?: number
+  durationMs?: number
   layout: SceneLayout
   seed: number
   animated: boolean
@@ -19,7 +21,10 @@ const props = defineProps<{
   energy?: number[]
   showcase?: boolean
 }>()
-const current = computed(() => props.lines[props.index]?.text ?? '')
+const currentLine = computed(
+  () => props.lines[props.index] ?? { id: 'empty', startMs: 0, text: '' }
+)
+const current = computed(() => currentLine.value.text)
 const previous = computed(() => props.lines[props.index - 1]?.text ?? '')
 const next = computed(() => props.lines[props.index + 1]?.text ?? '')
 const kinetic = computed(() => isKineticLayout(props.layout))
@@ -29,20 +34,35 @@ const readingLines = computed(() =>
     Math.max(0, props.index - 1) + 4
   )
 )
-const transitionKey = computed(
-  () =>
-    `${props.track?.id}-${props.layout}-${props.seed}-${props.layout === 'title' ? '' : props.index}`
+const lineEndMs = computed(() =>
+  Math.max(
+    currentLine.value.startMs + 1,
+    props.lines[props.index + 1]?.startMs ??
+      (props.durationMs && props.durationMs > currentLine.value.startMs
+        ? props.durationMs
+        : currentLine.value.startMs + 4000)
+  )
+)
+const transitionKey = computed(() =>
+  JSON.stringify([
+    props.track?.id,
+    props.layout,
+    props.seed,
+    props.layout === 'title' ? 'cover' : [currentLine.value, lineEndMs.value],
+  ])
+)
+const motionVariant = computed(() =>
+  shotVariant(props.track?.id ?? 'empty', props.index, props.seed)
 )
 const { enter, leave, cancel } = useLyricTransitions(() => ({
   animated: props.animated,
   reducedMotion: props.reducedMotion,
-  durationMs: props.lines[props.index + 1]
-    ? Math.max(
-        250,
-        props.lines[props.index + 1]!.startMs -
-          (props.lines[props.index]?.startMs ?? 0)
-      )
-    : 4000,
+  positionMs: props.positionMs ?? currentLine.value.startMs,
+  endMs: lineEndMs.value,
+  line: currentLine.value,
+  layout: props.layout,
+  variant: motionVariant.value,
+  trackId: props.track?.id ?? 'empty',
 }))
 </script>
 

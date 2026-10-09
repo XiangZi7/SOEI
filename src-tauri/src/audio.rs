@@ -316,14 +316,18 @@ fn play(
     state.duration_ms = duration;
     state.status = "playing".into();
     state.energy = [0.0; 4];
-    let mut updated = track;
-    updated.last_played = std::time::SystemTime::now()
+    if let Ok(updated) = record_playback(&app.state::<crate::AppState>().storage, track) {
+        let _ = app.emit_to("main", "library:track", updated);
+    }
+    Ok(())
+}
+
+fn record_playback(storage: &crate::storage::Storage, track: Track) -> AppResult<Track> {
+    let last_played = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .ok()
         .map(|value| value.as_secs());
-    let _ = app.state::<crate::AppState>().storage.save_track(&updated);
-    let _ = app.emit_to("main", "library:track", updated);
-    Ok(())
+    storage.update_last_played(&track.id, last_played)
 }
 
 fn publish(app: &AppHandle, projection: &Mutex<PlaybackSnapshot>, snapshot: &mut PlaybackSnapshot) {
@@ -453,6 +457,50 @@ mod tests {
             favorite: false,
             last_played: None,
         }
+    }
+    #[test]
+    fn queued_playback_preserves_updated_favorite_and_lyrics() -> AppResult<()> {
+        let connection = rusqlite::Connection::open_in_memory()?;
+        connection.execute_batch(
+            "CREATE TABLE tracks (id TEXT PRIMARY KEY, path TEXT UNIQUE NOT NULL, data TEXT NOT NULL);",
+        )?;
+        let storage = crate::storage::Storage(Mutex::new(connection));
+        let mut queued_track = track("b");
+        queued_track.local_path = "b.wav".into();
+        storage.save_track(&queued_track)?;
+        let queue = vec![track("a"), queued_track];
+
+        let mut latest = storage.track("b")?;
+        latest.favorite = true;
+        latest.lyric_ref = Some("custom.lrc".into());
+        latest.title = "Updated title".into();
+        latest.cover_ref = Some("updated-cover.jpg".into());
+        storage.save_track(&latest)?;
+
+        let snapshot = PlaybackSnapshot {
+            track_id: Some("a".into()),
+            ..Default::default()
+        };
+        let upcoming = next(&queue, &snapshot, true).expect("queued next track");
+        let updated = record_playback(&storage, upcoming)?;
+        assert!(
+            updated.favorite,
+            "queued playback must preserve a new favorite"
+        );
+        assert_eq!(updated.lyric_ref, latest.lyric_ref);
+        assert!(updated.last_played.is_some());
+        latest.last_played = updated.last_played;
+        assert_eq!(
+            serde_json::to_value(&updated).unwrap(),
+            serde_json::to_value(&latest).unwrap(),
+            "the emitted track must include all current metadata"
+        );
+        assert_eq!(
+            serde_json::to_value(storage.track("b")?).unwrap(),
+            serde_json::to_value(&latest).unwrap(),
+            "playback must persist only the last-played change"
+        );
+        Ok(())
     }
     #[test]
     fn queue_end_modes() {
