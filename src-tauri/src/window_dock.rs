@@ -3,6 +3,8 @@ use tauri::{PhysicalPosition, WebviewWindow};
 
 #[cfg(windows)]
 use std::sync::Arc;
+#[cfg(windows)]
+use tauri::{Emitter, Manager};
 
 const HANDLE_WIDTH: f64 = 12.0;
 
@@ -37,7 +39,17 @@ impl WindowDock {
         {
             let handle = window.hwnd().map_err(window_error)?.0 as usize;
             let owner = Arc::downgrade(&self.owner);
-            on_main_thread(window, move || native::enter(handle, owner, geometry))
+            let app = window.app_handle().clone();
+            on_main_thread(window, move || {
+                native::enter(
+                    handle,
+                    owner,
+                    geometry,
+                    Some(std::rc::Rc::new(move |state| {
+                        let _ = app.emit_to("main", "wallpaper-player:docked", state);
+                    })),
+                )
+            })
         }
         #[cfg(not(windows))]
         {
@@ -115,12 +127,24 @@ struct Rect {
     bottom: i32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+enum DockEdge {
+    Left,
+    Right,
+    Top,
+    Bottom,
+}
+
 #[derive(Clone, Copy, Debug)]
 struct DockGeometry {
     work: Rect,
     width: i32,
     height: i32,
     handle_width: i32,
+    position: PhysicalPosition<i32>,
+    edge: Option<DockEdge>,
+    snap_distance: i32,
 }
 
 impl DockGeometry {
@@ -151,10 +175,10 @@ impl DockGeometry {
         } else {
             1.0
         };
-        let handle_width = (HANDLE_WIDTH * scale)
-            .round()
-            .clamp(1.0, f64::from(width).min(f64::from(work_width)))
-            as i32;
+        let handle_width = (HANDLE_WIDTH * scale).round().clamp(
+            1.0,
+            f64::from(width.min(height)).min(f64::from(work_width.min(work_height))),
+        ) as i32;
         Ok(Self {
             work: Rect {
                 left,
@@ -165,20 +189,52 @@ impl DockGeometry {
             width,
             height,
             handle_width,
+            position: PhysicalPosition::new(right - width, bottom - height),
+            edge: Some(DockEdge::Right),
+            snap_distance: (24.0 * scale).round().clamp(1.0, f64::from(i32::MAX)) as i32,
         })
     }
 
-    fn expanded_x(self) -> i32 {
-        self.work.right - self.width
+    #[cfg(any(windows, test))]
+    fn at_position(mut self, x: i32, y: i32) -> Self {
+        let right = self.work.right - self.width;
+        let bottom = self.work.bottom - self.height;
+        let x = x.clamp(self.work.left.min(right), self.work.left.max(right));
+        let y = y.clamp(self.work.top.min(bottom), self.work.top.max(bottom));
+        // Choose the closest edge. At a bottom-right corner prefer the right edge,
+        // matching the initial dock, and keep the user's position along that edge.
+        let (edge, distance) = [
+            (DockEdge::Right, x.abs_diff(right)),
+            (DockEdge::Left, x.abs_diff(self.work.left)),
+            (DockEdge::Top, y.abs_diff(self.work.top)),
+            (DockEdge::Bottom, y.abs_diff(bottom)),
+        ]
+        .into_iter()
+        .min_by_key(|(_, distance)| *distance)
+        .unwrap();
+        self.edge = (distance <= self.snap_distance as u32).then_some(edge);
+        self.position = PhysicalPosition::new(x, y);
+        match self.edge {
+            Some(DockEdge::Left) => self.position.x = self.work.left,
+            Some(DockEdge::Right) => self.position.x = right,
+            Some(DockEdge::Top) => self.position.y = self.work.top,
+            Some(DockEdge::Bottom) => self.position.y = bottom,
+            None => {}
+        }
+        self
     }
 
     #[cfg(any(windows, test))]
     fn hidden_offset(self) -> i32 {
-        self.width - self.handle_width
+        match self.edge {
+            Some(DockEdge::Left | DockEdge::Right) => self.width - self.handle_width,
+            Some(DockEdge::Top | DockEdge::Bottom) => self.height - self.handle_width,
+            None => 0,
+        }
     }
 
     fn position(self) -> PhysicalPosition<i32> {
-        PhysicalPosition::new(self.expanded_x(), self.work.bottom - self.height)
+        self.position
     }
 
     #[cfg(any(windows, test))]
@@ -187,12 +243,20 @@ impl DockGeometry {
         let local = |edge: i32, origin: i32, limit: i32| {
             (i64::from(edge) - i64::from(origin)).clamp(0, i64::from(limit)) as i32
         };
-        Rect {
-            left: local(self.work.left, x, self.width).max(offset.clamp(0, self.width)),
+        let mut clip = Rect {
+            left: local(self.work.left, x, self.width),
             top: local(self.work.top, y, self.height),
             right: local(self.work.right, x, self.width),
             bottom: local(self.work.bottom, y, self.height),
+        };
+        match self.edge {
+            Some(DockEdge::Left) => clip.right = clip.right.min(self.width - offset),
+            Some(DockEdge::Right) => clip.left = clip.left.max(offset),
+            Some(DockEdge::Top) => clip.bottom = clip.bottom.min(self.height - offset),
+            Some(DockEdge::Bottom) => clip.top = clip.top.max(offset),
+            None => {}
         }
+        clip
     }
 }
 
@@ -277,7 +341,7 @@ mod motion {
 
 #[cfg(windows)]
 mod native {
-    use super::{motion::Motion, AppResult, DockGeometry};
+    use super::{motion::Motion, AppResult, DockEdge, DockGeometry};
     use std::{
         cell::RefCell,
         collections::HashMap,
@@ -289,31 +353,56 @@ mod native {
         time::Instant,
     };
     use windows_sys::Win32::{
-        Foundation::HWND,
-        Graphics::Gdi::{CreateRectRgn, DeleteObject, SetWindowRgn},
-        UI::WindowsAndMessaging::{
-            KillTimer, SetTimer, SetWindowPos, SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOSIZE,
-            SWP_NOZORDER,
+        Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM},
+        Graphics::Gdi::{
+            CreateRectRgn, DeleteObject, GetMonitorInfoW, MonitorFromWindow, SetWindowRgn,
+            MONITORINFO, MONITOR_DEFAULTTONEAREST,
+        },
+        UI::{
+            HiDpi::GetDpiForWindow,
+            WindowsAndMessaging::{
+                CallWindowProcW, DefWindowProcW, GetWindowLongPtrW, GetWindowRect, KillTimer,
+                SetTimer, SetWindowLongPtrW, SetWindowPos, GWLP_WNDPROC, SWP_NOACTIVATE,
+                SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER, WM_ENTERSIZEMOVE, WM_EXITSIZEMOVE,
+                WM_NCDESTROY, WNDPROC,
+            },
         },
     };
+
+    #[derive(Clone, serde::Serialize)]
+    pub(super) struct DockState {
+        edge: Option<DockEdge>,
+        dragging: bool,
+    }
+
+    type EventSink = std::rc::Rc<dyn Fn(DockState)>;
 
     struct DockedWindow {
         owner: Weak<()>,
         timer_id: usize,
         motion: Motion,
+        events: Option<EventSink>,
     }
 
     thread_local! {
         // Win32 timers and every mutation below run on the window's main thread.
         // Never hold this RefCell borrow across a native call that sends messages.
         static WINDOWS: RefCell<HashMap<usize, DockedWindow>> = RefCell::new(HashMap::new());
+        // Separate forwarding records let a later WebView subclass keep chaining
+        // through this procedure after compact mode is restored.
+        static PROCEDURES: RefCell<HashMap<usize, WNDPROC>> = RefCell::new(HashMap::new());
     }
 
     // A new session gets a new ID: a queued WM_TIMER from before leave/re-enter
     // cannot act on the new session, even if Windows reused the HWND.
     static NEXT_TIMER: AtomicUsize = AtomicUsize::new(0x534F_0000);
 
-    pub(super) fn enter(handle: usize, owner: Weak<()>, geometry: DockGeometry) -> AppResult<()> {
+    pub(super) fn enter(
+        handle: usize,
+        owner: Weak<()>,
+        geometry: DockGeometry,
+        events: Option<EventSink>,
+    ) -> AppResult<()> {
         let previous = WINDOWS.with(|windows| windows.borrow_mut().remove(&handle));
         if let Some(previous) = previous {
             unsafe { KillTimer(handle as HWND, previous.timer_id) };
@@ -326,9 +415,11 @@ mod native {
                     owner,
                     timer_id: NEXT_TIMER.fetch_add(1, Ordering::Relaxed),
                     motion,
+                    events,
                 },
             );
         });
+        install_proc(handle)?;
         // Keep the record on error, so the caller's rollback can clear any
         // successfully installed clipping region through leave().
         set_region(
@@ -379,8 +470,178 @@ mod native {
             WINDOWS.with(|windows| {
                 windows.borrow_mut().insert(handle, dock);
             });
+        } else {
+            remove_proc(handle);
         }
         result
+    }
+
+    fn install_proc(handle: usize) -> AppResult<()> {
+        if PROCEDURES.with(|procedures| procedures.borrow().contains_key(&handle)) {
+            return Ok(());
+        }
+        let previous = unsafe {
+            SetWindowLongPtrW(
+                handle as HWND,
+                GWLP_WNDPROC,
+                window_proc as *const () as isize,
+            )
+        };
+        if previous == 0 {
+            return Err(last_error("无法监听播放器拖动"));
+        }
+        let previous: WNDPROC = unsafe { std::mem::transmute(previous) };
+        PROCEDURES.with(|procedures| procedures.borrow_mut().insert(handle, previous));
+        Ok(())
+    }
+
+    fn remove_proc(handle: usize) {
+        let current = unsafe { GetWindowLongPtrW(handle as HWND, GWLP_WNDPROC) };
+        if current != window_proc as *const () as isize {
+            // A newer subclass still forwards to us; preserve its original chain.
+            return;
+        }
+        let previous = PROCEDURES.with(|procedures| procedures.borrow().get(&handle).copied());
+        if let Some(Some(previous)) = previous {
+            if unsafe {
+                SetWindowLongPtrW(handle as HWND, GWLP_WNDPROC, previous as *const () as isize)
+            } != 0
+            {
+                PROCEDURES.with(|procedures| procedures.borrow_mut().remove(&handle));
+            }
+        }
+    }
+
+    unsafe extern "system" fn window_proc(
+        window: HWND,
+        message: u32,
+        wparam: WPARAM,
+        lparam: LPARAM,
+    ) -> LRESULT {
+        // Let Tao finish its move loop before we send position/region messages.
+        // Never dispatch a Tauri window API from inside this window procedure.
+        if message == WM_ENTERSIZEMOVE {
+            begin_drag(window as usize);
+        } else if message == WM_NCDESTROY {
+            let dock = WINDOWS.with(|windows| windows.borrow_mut().remove(&(window as usize)));
+            if let Some(dock) = dock {
+                unsafe { KillTimer(window, dock.timer_id) };
+            }
+        }
+        let previous = PROCEDURES.with(|procedures| {
+            procedures
+                .borrow()
+                .get(&(window as usize))
+                .copied()
+                .flatten()
+        });
+        let result = if previous.is_some() {
+            unsafe { CallWindowProcW(previous, window, message, wparam, lparam) }
+        } else {
+            unsafe { DefWindowProcW(window, message, wparam, lparam) }
+        };
+        if message == WM_NCDESTROY {
+            PROCEDURES.with(|procedures| procedures.borrow_mut().remove(&(window as usize)));
+        }
+        if message == WM_EXITSIZEMOVE {
+            if let Err(error) = finish_drag(window as usize) {
+                eprintln!("播放器贴边失败: {}", error.message);
+                notify(window as usize, None, false);
+            }
+        }
+        result
+    }
+
+    fn notify(handle: usize, edge: Option<DockEdge>, dragging: bool) {
+        let events = WINDOWS.with(|windows| {
+            windows
+                .borrow()
+                .get(&handle)
+                .and_then(|dock| dock.events.clone())
+        });
+        if let Some(events) = events {
+            events(DockState { edge, dragging });
+        }
+    }
+
+    fn begin_drag(handle: usize) {
+        let timer = WINDOWS.with(|windows| {
+            let mut windows = windows.borrow_mut();
+            let dock = windows.get_mut(&handle)?;
+            dock.motion.stop();
+            dock.motion.offset = 0;
+            dock.motion.geometry.edge = None;
+            Some(dock.timer_id)
+        });
+        if let Some(timer) = timer {
+            unsafe { KillTimer(handle as HWND, timer) };
+            // Remove the old monitor clipping while crossing monitors or DPI scales.
+            let _ = clear_region(handle);
+            notify(handle, None, true);
+        }
+    }
+
+    fn read_geometry(handle: usize) -> AppResult<DockGeometry> {
+        let window = handle as HWND;
+        let mut rect = RECT::default();
+        let monitor = unsafe { MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST) };
+        let mut info = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            ..Default::default()
+        };
+        if unsafe { GetWindowRect(window, &mut rect) } == 0
+            || unsafe { GetMonitorInfoW(monitor, &mut info) } == 0
+        {
+            return Err(last_error("无法读取播放器拖动位置"));
+        }
+        let work = info.rcWork;
+        DockGeometry::new(
+            work.left,
+            work.top,
+            work.right.abs_diff(work.left),
+            work.bottom.abs_diff(work.top),
+            rect.right.abs_diff(rect.left),
+            rect.bottom.abs_diff(rect.top),
+            f64::from(unsafe { GetDpiForWindow(window) }) / 96.0,
+        )
+        .map(|geometry| geometry.at_position(rect.left, rect.top))
+    }
+
+    fn finish_drag(handle: usize) -> AppResult<()> {
+        let active = WINDOWS.with(|windows| {
+            windows
+                .borrow()
+                .get(&handle)
+                .is_some_and(|dock| dock.owner.strong_count() > 0)
+        });
+        if !active {
+            return Ok(());
+        }
+        // Read the destination monitor after the native drag and any DPI resize.
+        let geometry = read_geometry(handle)?;
+        WINDOWS.with(|windows| {
+            if let Some(dock) = windows.borrow_mut().get_mut(&handle) {
+                dock.motion = Motion::new(geometry);
+            }
+        });
+        let position = geometry.position();
+        if unsafe {
+            SetWindowPos(
+                handle as HWND,
+                null_mut(),
+                position.x,
+                position.y,
+                0,
+                0,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER,
+            )
+        } == 0
+        {
+            return Err(last_error("无法吸附播放器窗口"));
+        }
+        apply_frame(handle, geometry, 0)?;
+        notify(handle, geometry.edge, false);
+        Ok(())
     }
 
     pub(super) fn set_hidden(
@@ -393,6 +654,9 @@ mod native {
             let mut windows = windows.borrow_mut();
             let dock = windows.get_mut(&handle)?;
             if !dock.owner.ptr_eq(owner) {
+                return None;
+            }
+            if hidden && dock.motion.geometry.edge.is_none() {
                 return None;
             }
             dock.motion.retarget(hidden, reduced_motion, Instant::now());
@@ -453,6 +717,7 @@ mod native {
             Some(None) => {
                 unsafe { KillTimer(handle as HWND, timer_id) };
                 let _ = clear_region(handle);
+                remove_proc(handle);
             }
             None => {
                 // KillTimer does not purge already queued timer messages.
@@ -575,7 +840,7 @@ mod native {
             let owner = Arc::downgrade(&lifetime);
             let handle = window.0 as usize;
             let geometry = DockGeometry::new(0, 0, 1920, 1040, 560, 310, 1.0).unwrap();
-            enter(handle, owner.clone(), geometry).unwrap();
+            enter(handle, owner.clone(), geometry, None).unwrap();
             set_hidden(handle, &owner, true, true).unwrap();
             let rect = window.rect();
             assert_eq!((rect.left, rect.top), (1360, 730));
@@ -610,7 +875,7 @@ mod native {
             let owner = Arc::downgrade(&lifetime);
             let handle = window.0 as usize;
             let geometry = DockGeometry::new(0, 0, 1920, 1040, 560, 310, 1.0).unwrap();
-            enter(handle, owner.clone(), geometry).unwrap();
+            enter(handle, owner.clone(), geometry, None).unwrap();
             set_hidden(handle, &owner, true, false).unwrap();
             let old_timer = WINDOWS.with(|windows| windows.borrow()[&handle].timer_id);
             leave(handle, &owner).unwrap();
@@ -628,7 +893,7 @@ mod native {
             }
             let rect = window.rect();
             assert_eq!((rect.left, rect.top), (80, 90));
-            enter(handle, owner.clone(), geometry).unwrap();
+            enter(handle, owner.clone(), geometry, None).unwrap();
             let new_timer = WINDOWS.with(|windows| windows.borrow()[&handle].timer_id);
             assert_ne!(old_timer, new_timer);
             unsafe { tick(window.0, 0, old_timer, 0) };
@@ -638,12 +903,82 @@ mod native {
             leave(handle, &owner).unwrap();
             assert_eq!(unsafe { IsWindowVisible(window.0) }, 0);
         }
+
+        #[test]
+        fn all_native_edges_clip_the_entire_surface_and_release_clipping_for_drag() {
+            let window = HiddenWindow::new();
+            let lifetime = Arc::new(());
+            let owner = Arc::downgrade(&lifetime);
+            let handle = window.0 as usize;
+            let region = unsafe { CreateRectRgn(0, 0, 0, 0) };
+            for (x, y) in [(0, 240), (1360, 240), (500, 0), (500, 730)] {
+                let geometry = DockGeometry::new(0, 0, 1920, 1040, 560, 310, 1.0)
+                    .unwrap()
+                    .at_position(x, y);
+                enter(handle, owner.clone(), geometry, None).unwrap();
+                set_hidden(handle, &owner, true, true).unwrap();
+                let mut bounds = RECT::default();
+                assert_ne!(unsafe { GetWindowRgn(window.0, region) }, 0);
+                assert_ne!(unsafe { GetRgnBox(region, &mut bounds) }, 0);
+                let clip = geometry.clip(geometry.hidden_offset());
+                assert_eq!(
+                    (bounds.left, bounds.top, bounds.right, bounds.bottom),
+                    (clip.left, clip.top, clip.right, clip.bottom)
+                );
+                unsafe {
+                    windows_sys::Win32::UI::WindowsAndMessaging::SendMessageW(
+                        window.0,
+                        WM_ENTERSIZEMOVE,
+                        0,
+                        0,
+                    );
+                }
+                assert_eq!(unsafe { GetWindowRgn(window.0, region) }, 0);
+                set_hidden(handle, &owner, true, true).unwrap();
+                assert_eq!(unsafe { GetWindowRgn(window.0, region) }, 0);
+                leave(handle, &owner).unwrap();
+            }
+            assert_eq!(unsafe { IsWindowVisible(window.0) }, 0);
+            unsafe { DeleteObject(region) };
+        }
+
+        #[test]
+        fn native_drag_exit_uses_actual_monitor_and_new_position() {
+            use windows_sys::Win32::UI::WindowsAndMessaging::SendMessageW;
+            let window = HiddenWindow::new();
+            let lifetime = Arc::new(());
+            let owner = Arc::downgrade(&lifetime);
+            let handle = window.0 as usize;
+            let geometry = read_geometry(handle).unwrap();
+            enter(handle, owner.clone(), geometry, None).unwrap();
+            unsafe { SendMessageW(window.0, WM_ENTERSIZEMOVE, 0, 0) };
+            let top = geometry.work.top;
+            let x = geometry.work.left + (geometry.work.right - geometry.work.left - 560) / 2;
+            unsafe {
+                SetWindowPos(
+                    window.0,
+                    null_mut(),
+                    x,
+                    top + 8,
+                    0,
+                    0,
+                    SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+                );
+                SendMessageW(window.0, WM_EXITSIZEMOVE, 0, 0);
+            }
+            let rect = window.rect();
+            assert_eq!((rect.left, rect.top), (x, top));
+            let edge = WINDOWS.with(|windows| windows.borrow()[&handle].motion.geometry.edge);
+            assert_eq!(edge, Some(DockEdge::Top));
+            leave(handle, &owner).unwrap();
+            assert_eq!(unsafe { IsWindowVisible(window.0) }, 0);
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{motion::Motion, DockGeometry, Rect};
+    use super::{motion::Motion, DockEdge, DockGeometry, Rect};
     use std::time::{Duration, Instant};
 
     fn primary() -> DockGeometry {
@@ -653,7 +988,7 @@ mod tests {
     #[test]
     fn docks_against_work_area_above_taskbar() {
         let geometry = primary();
-        assert_eq!(geometry.expanded_x(), 1360);
+        assert_eq!(geometry.position().x, 1360);
         assert_eq!(geometry.position().y, 730);
         assert_eq!(geometry.hidden_offset(), 548);
         assert_eq!(
@@ -670,7 +1005,7 @@ mod tests {
     #[test]
     fn negative_monitor_origin_and_scaled_handle_keep_physical_alignment() {
         let geometry = DockGeometry::new(-2560, -160, 2520, 1400, 840, 465, 1.5).unwrap();
-        assert_eq!(geometry.expanded_x(), -880);
+        assert_eq!(geometry.position().x, -880);
         assert_eq!(geometry.position().y, 775);
         let clip = geometry.clip(geometry.hidden_offset());
         assert_eq!(clip.right - clip.left, 18);
@@ -689,6 +1024,95 @@ mod tests {
             assert_eq!(geometry.position().x, 1360);
             assert_eq!(geometry.width, 560);
         }
+    }
+
+    #[test]
+    fn dragging_snaps_to_each_edge_and_preserves_position_along_it() {
+        for (x, y, edge, position, clip) in [
+            (
+                15,
+                240,
+                DockEdge::Left,
+                (0, 240),
+                Rect {
+                    left: 0,
+                    top: 0,
+                    right: 12,
+                    bottom: 310,
+                },
+            ),
+            (
+                1345,
+                240,
+                DockEdge::Right,
+                (1360, 240),
+                Rect {
+                    left: 548,
+                    top: 0,
+                    right: 560,
+                    bottom: 310,
+                },
+            ),
+            (
+                500,
+                18,
+                DockEdge::Top,
+                (500, 0),
+                Rect {
+                    left: 0,
+                    top: 0,
+                    right: 560,
+                    bottom: 12,
+                },
+            ),
+            (
+                500,
+                710,
+                DockEdge::Bottom,
+                (500, 730),
+                Rect {
+                    left: 0,
+                    top: 298,
+                    right: 560,
+                    bottom: 310,
+                },
+            ),
+        ] {
+            let geometry = primary().at_position(x, y);
+            assert_eq!(geometry.edge, Some(edge));
+            assert_eq!((geometry.position().x, geometry.position().y), position);
+            assert_eq!(geometry.clip(geometry.hidden_offset()), clip);
+            for offset in 0..=geometry.hidden_offset() {
+                let clip = geometry.clip(offset);
+                assert!(clip.left >= 0 && clip.top >= 0);
+                assert!(clip.right <= geometry.width && clip.bottom <= geometry.height);
+                assert!(clip.right > clip.left && clip.bottom > clip.top);
+            }
+        }
+    }
+
+    #[test]
+    fn floating_window_does_not_hide_and_crossing_an_edge_still_snaps() {
+        let floating = primary().at_position(500, 240);
+        assert_eq!(floating.edge, None);
+        assert_eq!(floating.hidden_offset(), 0);
+        let mut motion = Motion::new(floating);
+        motion.retarget(true, false, Instant::now());
+        assert!(!motion.animating());
+        assert_eq!(primary().at_position(-80, 240).edge, Some(DockEdge::Left));
+        assert_eq!(primary().at_position(1500, 240).edge, Some(DockEdge::Right));
+    }
+
+    #[test]
+    fn destination_monitor_scale_controls_snap_distance_and_horizontal_handle() {
+        let destination = DockGeometry::new(-2560, -160, 2520, 1400, 840, 465, 1.5).unwrap();
+        let dock = destination.at_position(-1900, -130);
+        assert_eq!(dock.edge, Some(DockEdge::Top));
+        assert_eq!(dock.position().x, -1900);
+        assert_eq!(dock.position().y, -160);
+        let clip = dock.clip(dock.hidden_offset());
+        assert_eq!(clip.bottom - clip.top, 18);
+        assert_eq!(destination.at_position(-1900, -120).edge, None);
     }
 
     #[test]

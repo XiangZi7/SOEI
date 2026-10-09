@@ -8,14 +8,18 @@ import CoverComposition from '../visual/CoverComposition.vue'
 import PlaybackSeekBar from '../player/PlaybackSeekBar.vue'
 import PlaybackTransport from '../player/PlaybackTransport.vue'
 import { lyricIndexAt } from '../lyrics/lrc'
+import type { DockEdge } from './useWallpaperPlayerWindow'
 
-defineProps<{ hidden?: boolean }>()
+withDefaults(defineProps<{ hidden?: boolean; edge?: DockEdge | null }>(), {
+  edge: 'right',
+})
 const emit = defineEmits<{
   queue: []
   wallpaper: []
   settings: []
   restore: []
   reveal: []
+  drag: []
 }>()
 const player = useTemplateRef<HTMLElement>('player')
 const store = useMusicStore()
@@ -50,6 +54,7 @@ function revealFromKeyboard() {
     ref="player"
     class="wallpaper-player"
     :class="{ 'is-retracted': hidden }"
+    :data-dock-edge="edge"
     aria-label="壁纸模式播放器"
   >
     <button
@@ -75,6 +80,7 @@ function revealFromKeyboard() {
       :lines="lyrics"
       :index="lyricIndex"
       :energy="snapshot.status === 'playing' ? snapshot.energy : []"
+      @drag="$emit('drag')"
     >
       <template #leading>
         <div class="compact-actions">
@@ -151,11 +157,23 @@ function revealFromKeyboard() {
   backdrop-filter: blur(32px) saturate(1.35);
   transition: transform 180ms cubic-bezier(0.333333, 1, 0.666667, 1);
 }
-.wallpaper-player.is-retracted :deep(.cover-composition) {
+.wallpaper-player.is-retracted[data-dock-edge='right']
+  :deep(.cover-composition) {
   transform: translateX(calc(100% - 12px));
 }
+.wallpaper-player.is-retracted[data-dock-edge='left']
+  :deep(.cover-composition) {
+  transform: translateX(calc(12px - 100%));
+}
+.wallpaper-player.is-retracted[data-dock-edge='top'] :deep(.cover-composition) {
+  transform: translateY(calc(12px - 100%));
+}
+.wallpaper-player.is-retracted[data-dock-edge='bottom']
+  :deep(.cover-composition) {
+  transform: translateY(calc(100% - 12px));
+}
 .wallpaper-player :deep(.cover-chrome) {
-  cursor: default;
+  cursor: grab;
 }
 .wallpaper-edge {
   position: absolute;
@@ -173,6 +191,28 @@ function revealFromKeyboard() {
   width: 2px;
   height: 34px;
   background: #d4decbb3;
+}
+.wallpaper-player[data-dock-edge='left'] .wallpaper-edge {
+  inset: 0 auto 0 0;
+  box-shadow: inset -1px 0 #e1e8dc59;
+}
+.wallpaper-player[data-dock-edge='top'] .wallpaper-edge,
+.wallpaper-player[data-dock-edge='bottom'] .wallpaper-edge {
+  width: auto;
+  height: 12px;
+}
+.wallpaper-player[data-dock-edge='top'] .wallpaper-edge {
+  inset: 0 0 auto;
+  box-shadow: inset 0 -1px #e1e8dc59;
+}
+.wallpaper-player[data-dock-edge='bottom'] .wallpaper-edge {
+  inset: auto 0 0;
+  box-shadow: inset 0 1px #e1e8dc59;
+}
+.wallpaper-player[data-dock-edge='top'] .wallpaper-edge-grip,
+.wallpaper-player[data-dock-edge='bottom'] .wallpaper-edge-grip {
+  width: 34px;
+  height: 2px;
 }
 .wallpaper-edge:focus-visible {
   outline-offset: -2px;

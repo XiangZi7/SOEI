@@ -150,15 +150,9 @@ impl WindowAppearance {
         #[cfg(windows)]
         {
             self.frame.apply(window, true)?;
+            // A whole-HWND Acrylic surface stays visible behind the clipped WebView.
+            // Keep the native surface transparent; the player paints its own glass panel.
             window.set_effects(None::<WindowEffectsConfig>)?;
-            // CSS backdrop-filter cannot blur other applications behind a transparent WebView.
-            // Acrylic uses the OS compositor (DWM on Windows 11, composition blur on Windows 10).
-            window.set_effects(
-                tauri::window::EffectsBuilder::new()
-                    .effect(tauri::window::Effect::Acrylic)
-                    .color(tauri::window::Color(18, 24, 22, 96))
-                    .build(),
-            )?;
         }
         Ok(())
     }

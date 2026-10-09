@@ -2,6 +2,13 @@ import { computed, onScopeDispose, reactive, watch, type Ref } from 'vue'
 import { useEventListener } from '@vueuse/core'
 import { call, desktop, onNative } from '../../bridge/native'
 
+export type DockEdge = 'left' | 'right' | 'top' | 'bottom'
+
+interface DockState {
+  edge: DockEdge | null
+  dragging: boolean
+}
+
 interface WallpaperWindowOptions {
   keepOpen?: Readonly<Ref<boolean>>
   reducedMotion?: Readonly<Ref<boolean>>
@@ -17,8 +24,10 @@ export function useWallpaperPlayerWindow(
   const state = reactive({
     // 原生小窗已经完成尺寸和位置切换
     ready: false,
-    // 播放器正在向右收起或已收起
+    // 播放器正在向吸附边缘收起或已收起
     hidden: false,
+    edge: 'right' as DockEdge | null,
+    dragging: false,
     // 指针仍位于窗口内
     pointerInside: false,
     // 鼠标或触摸正在操作控件，离开窗口也不打断拖动
@@ -31,7 +40,7 @@ export function useWallpaperPlayerWindow(
   let generation = 0
   let disposed = false
   let hideTimer: ReturnType<typeof setTimeout> | undefined
-  let unlisten: (() => void) | undefined
+  const unlisteners: (() => void)[] = []
 
   function clearHide() {
     clearTimeout(hideTimer)
@@ -43,6 +52,8 @@ export function useWallpaperPlayerWindow(
       desktop &&
       enabled.value &&
       state.ready &&
+      state.edge !== null &&
+      !state.dragging &&
       !disposed &&
       !state.pointerInside &&
       !state.pointerDown &&
@@ -92,6 +103,30 @@ export function useWallpaperPlayerWindow(
   function reveal(force = false) {
     clearHide()
     setHidden(false, force)
+  }
+
+  function drag() {
+    if (!desktop || !state.ready || state.dragging) return
+    const request = generation
+    const previousEdge = state.edge
+    reveal()
+    state.dragging = true
+    state.edge = null
+    // 展开命令先完成，再启动原生拖动。松手由原生移动循环通知，
+    // 不依赖可能被 Windows 消耗的网页 pointerup。
+    pending = pending.then(async () => {
+      if (disposed || request !== generation || !enabled.value) return
+      try {
+        await call('window_action', { action: 'drag' })
+      } catch (error) {
+        if (request === generation) {
+          state.dragging = false
+          state.edge = previousEdge
+          scheduleHide()
+        }
+        report(error)
+      }
+    })
   }
 
   // 主窗口整体接收事件，弹层与队列不会被当成“离开播放器”。
@@ -144,17 +179,34 @@ export function useWallpaperPlayerWindow(
   })
 
   if (desktop) {
-    void onNative('wallpaper-player:revealed', () => {
-      // 托盘已展开原生窗口，仍需排队覆盖尚未完成的旧收起请求。
-      reveal(true)
-      state.pointerInside = root.matches(':hover')
-      scheduleHide(1200)
-    })
-      .then(cleanup => {
-        if (disposed) cleanup()
-        else unlisten = cleanup
+    const register = (subscription: Promise<() => void>) => {
+      void subscription
+        .then(cleanup => {
+          if (disposed) cleanup()
+          else unlisteners.push(cleanup)
+        })
+        .catch(report)
+    }
+    register(
+      onNative<DockState>('wallpaper-player:docked', dock => {
+        if (!enabled.value || disposed) return
+        clearHide()
+        state.edge = dock.edge
+        state.dragging = dock.dragging
+        state.hidden = false
+        state.pointerDown = dock.dragging
+        state.pointerInside = root.matches(':hover')
+        if (!dock.dragging) scheduleHide()
       })
-      .catch(report)
+    )
+    register(
+      onNative('wallpaper-player:revealed', () => {
+        // 托盘已展开原生窗口，仍需排队覆盖尚未完成的旧收起请求。
+        reveal(true)
+        state.pointerInside = root.matches(':hover')
+        scheduleHide(1200)
+      })
+    )
   }
 
   watch(
@@ -164,6 +216,8 @@ export function useWallpaperPlayerWindow(
       clearHide()
       state.ready = false
       state.hidden = false
+      state.edge = compact ? 'right' : null
+      state.dragging = false
       state.pointerDown = false
       state.keyboardFocus = false
       root.classList.toggle('wallpaper-player-active', compact)
@@ -196,9 +250,14 @@ export function useWallpaperPlayerWindow(
     disposed = true
     generation++
     clearHide()
-    unlisten?.()
+    unlisteners.forEach(cleanup => cleanup())
     root.classList.remove('wallpaper-player-active')
   })
 
-  return { hidden: computed(() => state.hidden), reveal }
+  return {
+    hidden: computed(() => state.hidden),
+    edge: computed(() => state.edge),
+    reveal,
+    drag,
+  }
 }

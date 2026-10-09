@@ -78,17 +78,21 @@ const {
   controlsHovered,
   testLoading,
 } = toRefs(state)
-const { hidden: wallpaperPlayerHidden, reveal: revealWallpaperPlayer } =
-  useWallpaperPlayerWindow(wallpaperPlayer, store.report, {
-    keepOpen: computed(
-      () =>
-        state.settingsOpen ||
-        state.wallpaperOpen ||
-        state.searchOpen ||
-        state.queueOpen
-    ),
-    reducedMotion: computed(() => preferences.value.reducedMotion),
-  })
+const {
+  hidden: wallpaperPlayerHidden,
+  edge: wallpaperPlayerEdge,
+  reveal: revealWallpaperPlayer,
+  drag: dragWallpaperPlayer,
+} = useWallpaperPlayerWindow(wallpaperPlayer, store.report, {
+  keepOpen: computed(
+    () =>
+      state.settingsOpen ||
+      state.wallpaperOpen ||
+      state.searchOpen ||
+      state.queueOpen
+  ),
+  reducedMotion: computed(() => preferences.value.reducedMotion),
+})
 const musicInput = useTemplateRef<HTMLInputElement>('musicInput')
 const lyricInput = useTemplateRef<HTMLInputElement>('lyricInput')
 let hideTimer: ReturnType<typeof setTimeout> | undefined
@@ -441,7 +445,9 @@ onBeforeUnmount(() => {
     <WallpaperPlayer
       v-if="wallpaperPlayer"
       :hidden="wallpaperPlayerHidden"
+      :edge="wallpaperPlayerEdge"
       @reveal="revealWallpaperPlayer"
+      @drag="dragWallpaperPlayer"
       @queue="queueOpen = !queueOpen"
       @wallpaper="openWallpaper"
       @settings="settings('visual')"

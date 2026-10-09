@@ -129,7 +129,7 @@ describe('壁纸播放器窗口切换', () => {
     scope.stop()
   })
 
-  it('离开后延迟向右收起，短暂离开不收起，悬停窄边立即展开', async () => {
+  it('离开后延迟向吸附边缘收起，短暂离开不收起，悬停窄边立即展开', async () => {
     native.call.mockResolvedValue(undefined)
     const { hover, hidden } = setup(true)
     await settle()
@@ -339,6 +339,71 @@ describe('壁纸播放器窗口切换', () => {
     hover(true)
     await settle()
     expect(native.call).toHaveBeenCalledTimes(1)
-    expect(native.unlisten).toHaveBeenCalledOnce()
+    expect(native.unlisten).toHaveBeenCalledTimes(2)
+  })
+
+  it('标题栏拖动期间不收起，原生松手通知决定新的吸附边缘', async () => {
+    native.call.mockResolvedValue(undefined)
+    const { drag, hover, hidden, edge } = setup(true)
+    await settle()
+    const docked = native.onNative.mock.calls.find(
+      ([event]) => event === 'wallpaper-player:docked'
+    )![1]
+    drag()
+    await settle()
+    expect(native.call).toHaveBeenLastCalledWith('window_action', {
+      action: 'drag',
+    })
+    expect(edge.value).toBeNull()
+    hover(false)
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(hidden.value).toBe(false)
+    docked({ edge: 'left', dragging: false })
+    expect(edge.value).toBe('left')
+    await vi.advanceTimersByTimeAsync(650)
+    expect(hidden.value).toBe(true)
+  })
+
+  it('拖回屏幕中央保持展开，重新贴到上下边缘才能自动隐藏', async () => {
+    native.call.mockResolvedValue(undefined)
+    const { hover, edge, hidden } = setup(true)
+    await settle()
+    const docked = native.onNative.mock.calls.find(
+      ([event]) => event === 'wallpaper-player:docked'
+    )![1]
+    docked({ edge: null, dragging: false })
+    hover(false)
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(edge.value).toBeNull()
+    expect(native.call).toHaveBeenCalledTimes(1)
+    for (const side of ['top', 'bottom']) {
+      docked({ edge: side, dragging: false })
+      await vi.advanceTimersByTimeAsync(650)
+      expect(edge.value).toBe(side)
+      expect(hidden.value).toBe(true)
+      hover(true)
+      await settle()
+      hover(false)
+    }
+  })
+
+  it('拖动启动失败恢复原来的边缘，停用后忽略旧松手通知', async () => {
+    native.call.mockResolvedValue(undefined)
+    const { drag, enabled, edge, report } = setup(true)
+    await settle()
+    native.call.mockRejectedValueOnce(new Error('drag failed'))
+    drag()
+    await settle()
+    expect(edge.value).toBe('right')
+    expect(report).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'drag failed' })
+    )
+    enabled.value = false
+    await settle()
+    const docked = native.onNative.mock.calls.find(
+      ([event]) => event === 'wallpaper-player:docked'
+    )![1]
+    docked({ edge: 'left', dragging: false })
+    expect(edge.value).toBeNull()
   })
 })
