@@ -4,6 +4,7 @@ mod library;
 mod model;
 mod storage;
 mod wallpaper;
+mod window_mode;
 
 use std::{path::PathBuf, sync::atomic::AtomicBool};
 use tauri::{
@@ -19,6 +20,7 @@ pub struct AppState {
     scan_cancel: AtomicBool,
     scan_busy: AtomicBool,
     wallpaper: wallpaper::WallpaperService,
+    window_mode: window_mode::WindowMode,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -72,6 +74,7 @@ pub fn run() {
                 scan_cancel: AtomicBool::new(false),
                 scan_busy: AtomicBool::new(false),
                 wallpaper: wallpaper::WallpaperService::default(),
+                window_mode: window_mode::WindowMode::default(),
             });
             let open = MenuItem::with_id(app, "open", "打开 SOEI", true, None::<&str>)?;
             let toggle = MenuItem::with_id(app, "toggle", "播放 / 暂停", true, None::<&str>)?;

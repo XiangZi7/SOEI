@@ -26,12 +26,16 @@ import ImmersiveScene from '../visual/ImmersiveScene.vue'
 import SceneModePicker from '../visual/SceneModePicker.vue'
 import SettingsDialog from '../settings/SettingsDialog.vue'
 import WallpaperDialog from '../wallpaper/WallpaperDialog.vue'
+import WallpaperPlayer from '../wallpaper/WallpaperPlayer.vue'
+import { useWallpaperPlayerWindow } from '../wallpaper/useWallpaperPlayerWindow'
 import type { Track } from '../../types/music'
 import Artwork from '../../components/ui/Artwork.vue'
 const store = useMusicStore()
 const { activeTrack, previewTrack, preferences, error, notice, scan } =
   storeToRefs(store)
 const backgroundTrack = computed(() => activeTrack.value ?? previewTrack.value)
+const wallpaperPlayer = computed(() => store.wallpaper.enabled.length > 0)
+useWallpaperPlayerWindow(wallpaperPlayer, store.report)
 // 响应式状态
 const state = reactive({
   // 沉浸场景开关
@@ -50,6 +54,8 @@ const state = reactive({
   queueOpen: false,
   // 全屏模式状态
   fullscreen: false,
+  // 进入壁纸前的全屏状态，用于恢复标题栏显示。
+  fullscreenBeforeWallpaper: false,
   // 控制层可见性
   controlsVisible: true,
   // 控制层鼠标悬停状态
@@ -138,7 +144,8 @@ function openCurrentScene(preview = false) {
   revealControls()
 }
 function openWallpaper() {
-  if (!state.sceneOpen) openCurrentScene(!store.activeTrack)
+  if (!wallpaperPlayer.value && !state.sceneOpen)
+    openCurrentScene(!store.activeTrack)
   state.wallpaperOpen = true
   revealControls()
 }
@@ -242,7 +249,16 @@ watch(notice, () => {
 watch(
   () => store.wallpaper.enabled.length,
   (enabled, previouslyEnabled) => {
+    if (enabled > 0 && previouslyEnabled === 0) {
+      state.scenePreview = false
+      state.wallpaperOpen = false
+      state.searchOpen = false
+      state.queueOpen = false
+      state.fullscreenBeforeWallpaper = state.fullscreen
+      state.fullscreen = false
+    }
     if (previouslyEnabled > 0 && enabled === 0) {
+      state.fullscreen = state.fullscreenBeforeWallpaper
       state.sceneOpen = false
       state.wallpaperOpen = false
       state.queueOpen = false
@@ -269,11 +285,13 @@ onBeforeUnmount(() => {
     class="music-space relative isolate min-h-dvh"
     :class="{
       'reduced-motion': preferences.reducedMotion,
-      'has-window-strip': desktop && !fullscreen,
+      'has-window-strip': desktop && !fullscreen && !wallpaperPlayer,
+      'is-wallpaper-player': wallpaperPlayer,
     }"
     :style="{ '--ambient-color': ambientColor }"
   >
     <div
+      v-if="!wallpaperPlayer"
       class="ambient-background pointer-events-none fixed inset-0 -z-10 overflow-hidden"
       aria-hidden="true"
     >
@@ -297,13 +315,13 @@ onBeforeUnmount(() => {
       <span class="ambient-beam" /><span class="ambient-reflection" />
     </div>
     <WindowTitleBar
-      v-if="desktop && !fullscreen && sceneOpen"
+      v-if="desktop && !fullscreen && sceneOpen && !wallpaperPlayer"
       class="fixed top-0 right-0 left-0 z-(--z-window)"
       @close="call('window_action', { action: 'close' }).catch(store.report)"
       @error="store.report"
     />
     <div
-      v-show="!sceneOpen"
+      v-show="!sceneOpen && !wallpaperPlayer"
       class="library-view relative isolate z-0"
     >
       <SpaceHeader
@@ -343,7 +361,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <footer
-      v-show="!sceneOpen"
+      v-show="!sceneOpen && !wallpaperPlayer"
       class="space-colophon mx-auto flex items-end justify-between font-display text-[9px] leading-[1.7] tracking-[.2em] text-muted"
     >
       <p>A NEW WAY TO FEEL MUSIC.<br />FOR A MORE BEAUTIFUL TOMORROW.</p>
@@ -354,9 +372,11 @@ onBeforeUnmount(() => {
         音楽で、少しだけ特別に。
       </p>
     </footer>
-    <Transition name="scene"
+    <Transition
+      name="scene"
+      :css="!wallpaperPlayer"
       ><div
-        v-if="sceneOpen"
+        v-if="sceneOpen && !wallpaperPlayer"
         class="scene-view fixed inset-0 z-(--z-scene)"
         @pointermove="revealControls"
         @touchstart="revealControls"
@@ -408,7 +428,15 @@ onBeforeUnmount(() => {
           </div>
         </div></div
     ></Transition>
+    <WallpaperPlayer
+      v-if="wallpaperPlayer"
+      @queue="queueOpen = !queueOpen"
+      @wallpaper="openWallpaper"
+      @settings="settings('visual')"
+      @restore="store.setWallpaper([])"
+    />
     <div
+      v-if="!wallpaperPlayer"
       class="player-dock scene-controls fixed right-[5%] bottom-9 left-[5%] z-(--z-controls) mx-auto max-w-260 max-sm:right-[4%] max-sm:bottom-5 max-sm:left-[4%]"
       @pointerenter="controlsHovered = true"
       @pointerleave="leaveControls"
@@ -425,6 +453,7 @@ onBeforeUnmount(() => {
       ><div
         v-if="queueOpen"
         class="fixed right-[5%] bottom-36 z-(--z-popover) max-sm:right-[3%] max-sm:bottom-25"
+        :class="{ 'compact-queue': wallpaperPlayer }"
       >
         <QueuePanel @close="queueOpen = false" /></div
     ></Transition>
@@ -434,7 +463,8 @@ onBeforeUnmount(() => {
       @select="select"
     />
     <WallpaperDialog
-      v-if="sceneOpen && wallpaperOpen"
+      v-if="(sceneOpen || wallpaperPlayer) && wallpaperOpen"
+      :compact="wallpaperPlayer"
       @close="wallpaperOpen = false"
     />
     <SettingsDialog
@@ -500,6 +530,17 @@ onBeforeUnmount(() => {
 .music-space {
   --navigation-height: 112px;
   padding: calc(var(--navigation-height) + 24px) 3vw 166px;
+}
+.music-space.is-wallpaper-player {
+  padding: 0;
+  height: 100dvh;
+  overflow: hidden;
+}
+.compact-queue {
+  top: 42px;
+  bottom: 12px;
+  overflow-y: auto;
+  border-radius: var(--radius-panel);
 }
 .library-view {
   max-width: 1280px;

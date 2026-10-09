@@ -9,7 +9,17 @@ const props = defineProps<{
   lines: LyricLine[]
   index: number
   energy?: number[]
+  compact?: boolean
 }>()
+const emit = defineEmits<{ drag: [] }>()
+function drag(event: MouseEvent) {
+  if (
+    props.compact &&
+    event.button === 0 &&
+    !(event.target as HTMLElement).closest('button, input, summary')
+  )
+    emit('drag')
+}
 const current = computed(() => props.lines[props.index]?.text ?? '')
 const upcoming = computed(() =>
   props.index < 0 ? [] : props.lines.slice(props.index + 1, props.index + 5)
@@ -23,13 +33,21 @@ const bars = Array.from(
 </script>
 
 <template>
-  <article class="cover-composition">
-    <header class="cover-chrome">
-      <span
-        class="cover-marks"
-        aria-hidden="true"
-        ><i /><i
-      /></span>
+  <article
+    class="cover-composition"
+    :class="{ compact }"
+  >
+    <header
+      class="cover-chrome"
+      @mousedown="drag"
+    >
+      <slot name="leading">
+        <span
+          class="cover-marks"
+          aria-hidden="true"
+          ><i /><i
+        /></span>
+      </slot>
       <span
         class="cover-rule"
         aria-hidden="true"
@@ -89,9 +107,11 @@ const bars = Array.from(
                   : '00:00 / ' + formatTime(track?.durationMs ?? 0)
               }}</span></slot
             >
-            <span class="cover-status">{{
-              track?.demo ? '视觉预览 · 无音频' : '此刻正在听'
-            }}</span>
+            <span
+              v-if="!compact"
+              class="cover-status"
+              >{{ track?.demo ? '视觉预览 · 无音频' : '此刻正在听' }}</span
+            >
           </div>
         </div>
         <div class="cover-transport"><slot name="controls" /></div>
@@ -302,6 +322,92 @@ const bars = Array.from(
   color: #abb4a1;
   line-height: 1.8;
 }
+.compact {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border-radius: 10px;
+}
+.compact .cover-chrome {
+  flex: 0 0 38px;
+  min-height: 0;
+  gap: 10px;
+  padding: 0 10px;
+  user-select: none;
+  cursor: move;
+}
+.compact .cover-lyrics-label {
+  font-size: 10px;
+}
+.compact .cover-rule-short {
+  flex-basis: 12%;
+}
+.compact .cover-body {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  grid-template-columns: 63% 37%;
+  padding: 15px 26px 24px;
+}
+.compact .cover-player {
+  padding-right: 25px;
+}
+.compact .cover-record {
+  grid-template-columns: 52% minmax(0, 1fr);
+  gap: 18px;
+}
+.compact .cover-info {
+  padding-top: 13px;
+}
+.compact .cover-info h1 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: clamp(16px, 3.3cqw, 21px);
+  line-height: 1.15;
+}
+.compact .cover-artist {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  margin-top: 5px;
+  font-size: 9px;
+}
+.compact .cover-waveform {
+  height: 50px;
+  min-height: 0;
+}
+.compact .cover-transport {
+  margin-top: auto;
+  margin-inline: -7px;
+  padding-top: 12px;
+  transform: none;
+}
+.compact .cover-lyrics {
+  padding: 6px 0 0 35px;
+  scrollbar-width: none;
+  mask-image: linear-gradient(#000 80%, transparent);
+}
+.compact .cover-lyrics::-webkit-scrollbar {
+  display: none;
+}
+.compact .cover-current {
+  font-size: 17px;
+  line-height: 1.8;
+  letter-spacing: 0.08em;
+}
+.compact .cover-upcoming {
+  margin-top: 22px;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.compact .cover-upcoming p {
+  margin-bottom: 3px;
+}
 @media (max-width: 520px) {
   .cover-body {
     height: 67cqw;
@@ -327,6 +433,27 @@ const bars = Array.from(
   .cover-transport {
     margin-left: -5px;
     margin-right: -5px;
+  }
+  .compact .cover-body {
+    padding: 10px 18px 16px;
+  }
+  .compact .cover-player {
+    padding-right: 16px;
+  }
+  .compact .cover-record {
+    gap: 12px;
+  }
+  .compact .cover-info {
+    padding-top: 6px;
+  }
+  .compact .cover-waveform {
+    height: 32px;
+  }
+  .compact .cover-lyrics {
+    padding-left: 20px;
+  }
+  .compact .cover-current {
+    font-size: 14px;
   }
 }
 </style>

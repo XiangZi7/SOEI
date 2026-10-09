@@ -6,6 +6,7 @@ import { useMusicStore } from '../../stores/music'
 import { AppIcon, UiButton, UiDialog, UiIconButton } from '../../components/ui'
 
 defineEmits<{ close: [] }>()
+defineProps<{ compact?: boolean }>()
 const store = useMusicStore()
 const { activeTrack, displays, wallpaper, error } = storeToRefs(store)
 const state = reactive({
@@ -45,9 +46,15 @@ async function applyWallpaper(enabled: string[]) {
     >
       <header
         class="flex-between min-h-28 shrink-0 border-b border-line px-7 py-7 max-sm:px-5"
+        :class="{ 'compact-header': compact }"
       >
         <div>
-          <p class="eyebrow">DISPLAY &amp; WALLPAPER</p>
+          <p
+            v-if="!compact"
+            class="eyebrow"
+          >
+            DISPLAY &amp; WALLPAPER
+          </p>
           <h2
             id="wallpaper-title"
             class="mt-2 font-display text-2xl"
@@ -61,8 +68,14 @@ async function applyWallpaper(enabled: string[]) {
           @click="$emit('close')"
         />
       </header>
-      <div class="min-h-0 overflow-y-auto px-7 py-5 max-sm:px-5">
-        <p class="mb-5 text-label leading-loose text-muted">
+      <div
+        class="min-h-0 overflow-y-auto px-7 py-5 max-sm:px-5"
+        :class="{ 'compact-content': compact }"
+      >
+        <p
+          v-if="!compact"
+          class="mb-5 text-label leading-loose text-muted"
+        >
           将当前歌曲的沉浸场景显示在桌面图标后方，所有显示器同步音乐与歌词。
         </p>
         <p
@@ -123,6 +136,7 @@ async function applyWallpaper(enabled: string[]) {
       </div>
       <footer
         class="flex shrink-0 flex-wrap items-center gap-2.5 border-t border-line px-7 py-5 max-sm:px-5"
+        :class="{ 'compact-footer': compact }"
       >
         <UiButton
           variant="solid"
@@ -148,3 +162,26 @@ async function applyWallpaper(enabled: string[]) {
     </section>
   </UiDialog>
 </template>
+
+<style scoped>
+.compact-header {
+  min-height: 58px;
+  padding-block: 8px;
+}
+.compact-header h2 {
+  margin-top: 0;
+  font-size: 20px;
+}
+.compact-content {
+  padding-block: 10px;
+}
+.compact-content > p {
+  margin-bottom: 4px;
+}
+.compact-content > label {
+  padding-block: 8px;
+}
+.compact-footer {
+  padding-block: 10px;
+}
+</style>

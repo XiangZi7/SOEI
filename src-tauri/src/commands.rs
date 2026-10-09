@@ -311,6 +311,14 @@ pub fn window_action(window: WebviewWindow, app: AppHandle, action: String) -> A
         window
     };
     match action.as_str() {
+        "wallpaper-player" => {
+            main_only(&window)?;
+            return app.state::<AppState>().window_mode.compact(&window);
+        }
+        "restore-player" => {
+            main_only(&window)?;
+            return app.state::<AppState>().window_mode.restore(&window);
+        }
         "minimize" => window.minimize(),
         "maximize" => {
             if window.is_maximized().unwrap_or(false) {

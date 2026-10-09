@@ -5,7 +5,11 @@ import { storeToRefs } from 'pinia'
 import { useMusicStore } from '../../stores/music'
 import { AppIcon, UiButton, UiIconButton, UiSlider } from '../../components/ui'
 
-const props = defineProps<{ preview?: boolean; expanded?: boolean }>()
+const props = defineProps<{
+  preview?: boolean
+  expanded?: boolean
+  expandLabel?: string
+}>()
 const emit = defineEmits<{ queue: []; fullscreen: [] }>()
 const options = useTemplateRef<HTMLDetailsElement>('options')
 function closeOptions() {
@@ -145,7 +149,7 @@ function next(direction: number) {
       class="transport-fullscreen"
       icon="maximize"
       :icon-size="14"
-      label="切换全屏"
+      :label="expandLabel ?? '切换全屏'"
       @click="$emit('fullscreen')"
     />
     <details
