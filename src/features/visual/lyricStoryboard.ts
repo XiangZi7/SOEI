@@ -90,7 +90,7 @@ export function buildLyricShot(
   trackId: string,
   index: number,
   seed = 0,
-  line?: LyricLine,
+  line?: LyricLine
 ) {
   const variant = shotVariant(trackId, index, seed)
   const placementVariant = variant % 4
@@ -123,22 +123,29 @@ export function buildLyricShot(
       (layout === 'montage' && variant === 3) ||
       (layout === 'echo' && variant >= 4),
     fragments: pieces.map((piece, position) => {
-      const units = line && characters ? richLyricGlyphs(line, piece, textOffset) : (characters ? lyricGlyphs(piece) : [piece]).map(text => ({ text, ruby: undefined }))
+      const units =
+        line && characters
+          ? richLyricGlyphs(line, piece, textOffset)
+          : (characters ? lyricGlyphs(piece) : [piece]).map(text => ({
+              text,
+              ruby: undefined,
+            }))
       textOffset += piece.length
       return {
-      text: piece,
-      glyphs: units.map(unit => unit.text),
-      ruby: units.map(unit => unit.ruby),
-      placement: compact
-        ? 'self-center'
-        : layout === 'echo'
-          ? variant % 2
-            ? 'self-start'
-            : 'self-center'
-          : placements[placementVariant]![position]!,
-      direction: directions[placementVariant]![position]!,
-      emphasis: !compact && position === hero,
-      card: layout === 'collage' || (layout === 'montage' && variant === 2),
-    }}),
+        text: piece,
+        glyphs: units.map(unit => unit.text),
+        ruby: units.map(unit => unit.ruby),
+        placement: compact
+          ? 'self-center'
+          : layout === 'echo'
+            ? variant % 2
+              ? 'self-start'
+              : 'self-center'
+            : placements[placementVariant]![position]!,
+        direction: directions[placementVariant]![position]!,
+        emphasis: !compact && position === hero,
+        card: layout === 'collage' || (layout === 'montage' && variant === 2),
+      }
+    }),
   }
 }

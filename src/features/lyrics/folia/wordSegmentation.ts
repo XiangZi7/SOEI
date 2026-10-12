@@ -1,6 +1,6 @@
 // Adapted from Folia (AGPL-3.0); see third_party/Folia-NOTICE.md.
-import type { Line } from './model';
-import { splitLyricGraphemes } from './graphemeTiming';
+import type { Line } from './model'
+import { splitLyricGraphemes } from './graphemeTiming'
 
 // src/utils/lyrics/wordSegmentation.ts
 // The single word-granularity segmenter for lyrics. Before this file, sonnetSemantic.ts and
@@ -13,66 +13,73 @@ import { splitLyricGraphemes } from './graphemeTiming';
 // no-override path for text that has no Line behind it.
 
 export interface LyricWordSegment {
-    segment: string;
-    /** Offset of this segment inside the source text, in code units. */
-    index: number;
-    isWordLike: boolean;
+  segment: string
+  /** Offset of this segment inside the source text, in code units. */
+  index: number
+  isWordLike: boolean
 }
 
-const PUNCTUATION_ONLY = /^[\s\p{P}\p{S}]+$/u;
+const PUNCTUATION_ONLY = /^[\s\p{P}\p{S}]+$/u
 
-const isWordLikeText = (text: string) => !PUNCTUATION_ONLY.test(text);
+const isWordLikeText = (text: string) => !PUNCTUATION_ONLY.test(text)
 
 /**
  * Rebuilds full segment records from a bare boundary list. Used both for the user's saved
  * segmentation and for anything that stores boundaries as plain strings.
  */
-export const segmentsFromBoundaries = (boundaries: string[]): LyricWordSegment[] => {
-    let cursor = 0;
-    return boundaries.map(segment => {
-        const part = { segment, index: cursor, isWordLike: isWordLikeText(segment) };
-        cursor += segment.length;
-        return part;
-    });
-};
+export const segmentsFromBoundaries = (
+  boundaries: string[]
+): LyricWordSegment[] => {
+  let cursor = 0
+  return boundaries.map(segment => {
+    const part = { segment, index: cursor, isWordLike: isWordLikeText(segment) }
+    cursor += segment.length
+    return part
+  })
+}
 
 /**
  * Intl.Segmenter word split, falling back to graphemes when the runtime has no Segmenter. The
  * fallback preserves every code unit, so offsets stay valid and line timing is never lost.
  */
 export const segmentTextWords = (text: string): LyricWordSegment[] => {
-    if (!text) {
-        return [];
-    }
+  if (!text) {
+    return []
+  }
 
-    const Segmenter = typeof Intl !== 'undefined' ? Intl.Segmenter : undefined;
-    if (Segmenter) {
-        try {
-            return Array.from(new Segmenter(undefined, { granularity: 'word' }).segment(text), part => ({
-                segment: part.segment,
-                index: part.index,
-                isWordLike: part.isWordLike ?? isWordLikeText(part.segment),
-            }));
-        } catch {
-            // The grapheme fallback below preserves every code unit and the line timing.
-        }
+  const Segmenter = typeof Intl !== 'undefined' ? Intl.Segmenter : undefined
+  if (Segmenter) {
+    try {
+      return Array.from(
+        new Segmenter(undefined, { granularity: 'word' }).segment(text),
+        part => ({
+          segment: part.segment,
+          index: part.index,
+          isWordLike: part.isWordLike ?? isWordLikeText(part.segment),
+        })
+      )
+    } catch {
+      // The grapheme fallback below preserves every code unit and the line timing.
     }
+  }
 
-    return segmentsFromBoundaries(splitLyricGraphemes(text));
-};
+  return segmentsFromBoundaries(splitLyricGraphemes(text))
+}
 
 /**
  * True when the boundaries reconstruct the text exactly. A saved segmentation that fails this is
  * stale (the lyric source changed under it) and must be ignored rather than applied at an offset.
  */
-export const isValidWordSegmentation = (text: string, boundaries: string[] | undefined): boolean => (
-    Array.isArray(boundaries)
-    && boundaries.length > 0
-    && boundaries.every(segment => typeof segment === 'string')
-    && boundaries.join('') === text
-);
+export const isValidWordSegmentation = (
+  text: string,
+  boundaries: string[] | undefined
+): boolean =>
+  Array.isArray(boundaries) &&
+  boundaries.length > 0 &&
+  boundaries.every(segment => typeof segment === 'string') &&
+  boundaries.join('') === text
 
-const EDGE_WHITESPACE = /^(\s*)(.*?)(\s*)$/su;
+const EDGE_WHITESPACE = /^(\s*)(.*?)(\s*)$/su
 
 /**
  * Lifts the whitespace at a saved boundary's edges out into segments of its own, so a saved split
@@ -92,20 +99,25 @@ const EDGE_WHITESPACE = /^(\s*)(.*?)(\s*)$/su;
  * consumers already handle it (or already fall back) exactly as they do today. Punctuation is left
  * attached for the same reason: the sticky passes in tempera and sonnet would re-attach it anyway.
  */
-const splitEdgeWhitespace = (boundaries: string[]): string[] => boundaries.flatMap(boundary => {
-    const [, lead, core, trail] = EDGE_WHITESPACE.exec(boundary) ?? [];
+const splitEdgeWhitespace = (boundaries: string[]): string[] =>
+  boundaries.flatMap(boundary => {
+    const [, lead, core, trail] = EDGE_WHITESPACE.exec(boundary) ?? []
     // No core means the boundary is whitespace only, which is already the shape we want.
-    return core ? [lead, core, trail].filter(Boolean) : [boundary].filter(Boolean);
-});
+    return core
+      ? [lead, core, trail].filter(Boolean)
+      : [boundary].filter(Boolean)
+  })
 
 /** Word segments for a line: the user's saved split when it is valid, else Intl.Segmenter. */
-export const segmentLyricWords = (line: Pick<Line, 'fullText' | 'wordSegments'>): LyricWordSegment[] => {
-    if (isValidWordSegmentation(line.fullText, line.wordSegments)) {
-        return segmentsFromBoundaries(splitEdgeWhitespace(line.wordSegments!));
-    }
+export const segmentLyricWords = (
+  line: Pick<Line, 'fullText' | 'wordSegments'>
+): LyricWordSegment[] => {
+  if (isValidWordSegmentation(line.fullText, line.wordSegments)) {
+    return segmentsFromBoundaries(splitEdgeWhitespace(line.wordSegments!))
+  }
 
-    return segmentTextWords(line.fullText);
-};
+  return segmentTextWords(line.fullText)
+}
 
 /**
  * Fingerprint of a line's saved split, for layout cache keys and memo dependencies.
@@ -115,11 +127,14 @@ export const segmentLyricWords = (line: Pick<Line, 'fullText' | 'wordSegments'>)
  * exactly — and no second copy of the lyric is built on paths that run per frame. Empty string when
  * the line is on the default split, so adding it to a key changes nothing for lyrics without one.
  */
-export const getWordSegmentationKey = (line: Pick<Line, 'wordSegments'>): string => (
-    line.wordSegments ? line.wordSegments.map(segment => segment.length).join(',') : ''
-);
+export const getWordSegmentationKey = (
+  line: Pick<Line, 'wordSegments'>
+): string =>
+  line.wordSegments
+    ? line.wordSegments.map(segment => segment.length).join(',')
+    : ''
 
 /** Whether this line will render with a user-supplied split rather than the default one. */
-export const hasWordSegmentationOverride = (line: Pick<Line, 'fullText' | 'wordSegments'>): boolean => (
-    isValidWordSegmentation(line.fullText, line.wordSegments)
-);
+export const hasWordSegmentationOverride = (
+  line: Pick<Line, 'fullText' | 'wordSegments'>
+): boolean => isValidWordSegmentation(line.fullText, line.wordSegments)

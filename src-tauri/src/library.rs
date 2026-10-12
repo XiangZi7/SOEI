@@ -298,6 +298,36 @@ mod tests {
         std::fs::remove_dir(directory).unwrap();
     }
     #[test]
+    fn rich_sidecars_and_binary_lyrics_are_preserved() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory =
+            std::env::temp_dir().join(format!("soei-rich-lyrics-{}-{unique}", std::process::id()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let audio = directory.join("歌曲.wav");
+        let ttml = directory.join("歌曲.TTML");
+        std::fs::write(&ttml, b"<tt/>").unwrap();
+        assert_eq!(find_lyric_sidecar(&audio), Some(ttml.clone()));
+        let lrc = directory.join("歌曲.lrc");
+        std::fs::write(&lrc, b"[00:01]hello").unwrap();
+        assert_eq!(find_lyric_sidecar(&audio), Some(lrc.clone()));
+        let binary = directory.join("歌曲.krc");
+        let bytes = [b'k', b'r', b'c', b'1', 0xff, 0, 0x80];
+        std::fs::write(&binary, bytes).unwrap();
+        let fixture_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures");
+        let mut track = read_track(&fixture_root.join("测试音楽.wav"), &fixture_root).unwrap();
+        track.lyric_ref = Some(binary.to_string_lossy().into_owned());
+        let source = read_lyrics(&track).unwrap().unwrap();
+        assert_eq!(source.name, "歌曲.krc");
+        assert_eq!(source.bytes, bytes);
+        std::fs::remove_file(binary).unwrap();
+        std::fs::remove_file(lrc).unwrap();
+        std::fs::remove_file(ttml).unwrap();
+        std::fs::remove_dir(directory).unwrap();
+    }
+    #[test]
     fn unicode_file_index_and_sidecar() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures");
         let track = read_track(&root.join("测试音楽.wav"), &root).expect("index PCM WAV");

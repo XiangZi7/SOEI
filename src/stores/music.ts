@@ -3,7 +3,10 @@ import { defineStore } from 'pinia'
 import { call, desktop, errorMessage, onNative } from '../bridge/native'
 import { demoTracks } from '../features/library/demo'
 import { isLyricFilename, parseLyrics } from '../features/lyrics/parser'
-import { decodeLyricSource, readLyricFile } from '../features/lyrics/fileDecoding'
+import {
+  decodeLyricSource,
+  readLyricFile,
+} from '../features/lyrics/fileDecoding'
 import {
   playbackTestLyrics,
   playbackTestTrack,
@@ -124,10 +127,21 @@ export const useMusicStore = defineStore('music', () => {
         durationMs: activeTrack.value?.durationMs,
       })
     } catch (error) {
-      return { lines: [], format: 'lrc' as const, isWordByWord: false, error: errorMessage(error) }
+      return {
+        lines: [],
+        format: 'lrc' as const,
+        isWordByWord: false,
+        error: errorMessage(error),
+      }
     }
   })
   const lyrics = computed(() => lyricDocument.value.lines)
+  watch(
+    () => lyricDocument.value.error,
+    error => {
+      if (error) state.error = `歌词解析失败：${error}`
+    }
+  )
   const queueTracks = computed(() =>
     state.snapshot.queue
       .map(id => state.realTracks.find(track => track.id === id))
@@ -254,10 +268,14 @@ export const useMusicStore = defineStore('music', () => {
         if (request !== lyricRequest) return
         upsert(track)
         state.lyricText = decodeLyricSource(source)
-        state.lyricFilename = typeof source === 'object' && source ? source.name : track.lyricRef ?? ''
+        state.lyricFilename =
+          typeof source === 'object' && source
+            ? source.name
+            : (track.lyricRef ?? '')
       } else {
         state.lyricText = browserLyrics.get(id) ?? ''
-        state.lyricFilename = state.realTracks.find(track => track.id === id)?.lyricRef ?? ''
+        state.lyricFilename =
+          state.realTracks.find(track => track.id === id)?.lyricRef ?? ''
       }
     } catch (error) {
       if (request === lyricRequest) report(error)
@@ -536,7 +554,10 @@ export const useMusicStore = defineStore('music', () => {
       const source = await call<LyricFileSource | null>('lyrics_import', { id })
       if (source !== null) {
         const text = decodeLyricSource(source)
-        const filename = typeof source === 'object' ? source.name : state.realTracks.find(track => track.id === id)?.lyricRef ?? ''
+        const filename =
+          typeof source === 'object'
+            ? source.name
+            : (state.realTracks.find(track => track.id === id)?.lyricRef ?? '')
         const parsed = parseLyrics(text, { filename })
         if (state.snapshot.trackId === id) {
           ++lyricRequest

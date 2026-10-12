@@ -36,7 +36,8 @@ const kinetic = computed(() => isKineticLayout(props.layout))
 const lineEndMs = computed(() =>
   Math.max(
     currentLine.value.startMs + 1,
-    currentLine.value.endMs ?? props.lines[props.index + 1]?.startMs ??
+    currentLine.value.endMs ??
+      props.lines[props.index + 1]?.startMs ??
       (props.durationMs && props.durationMs > currentLine.value.startMs
         ? props.durationMs
         : currentLine.value.startMs + 4000)
@@ -103,10 +104,17 @@ const { enter, leave, cancel } = useLyricTransitions(() => ({
           ><slot name="cover-window"
         /></template> </CoverComposition
     ></Transition>
-    <LyricRail v-else-if="layout === 'readable' && lines.length" :lines="lines" :index="index"
-      :position-ms="positionMs ?? currentLine.startMs" :duration-ms="durationMs"
-      :reduced-motion="reducedMotion || !animated" :showcase="showcase" :agents="agents"
-      @seek="emit('seek', $event)" />
+    <LyricRail
+      v-else-if="layout === 'readable' && lines.length"
+      :lines="lines"
+      :index="index"
+      :position-ms="positionMs ?? currentLine.startMs"
+      :duration-ms="durationMs"
+      :reduced-motion="reducedMotion || !animated"
+      :showcase="showcase"
+      :agents="agents"
+      @seek="emit('seek', $event)"
+    />
     <template
       v-else-if="
         layout === 'title' ||
@@ -184,10 +192,26 @@ const { enter, leave, cancel } = useLyricTransitions(() => ({
                     : 'mt-9 text-xl max-sm:mt-4 max-sm:text-base'
                 "
               >
-                <TimedLyricText :line="currentLine" :end-ms="lineEndMs" :position-ms="positionMs ?? currentLine.startMs" :reduced-motion="reducedMotion" />
+                <TimedLyricText
+                  :line="currentLine"
+                  :end-ms="lineEndMs"
+                  :position-ms="positionMs ?? currentLine.startMs"
+                  :reduced-motion="reducedMotion"
+                />
               </p>
-              <LyricAnnotations v-if="current" :line="currentLine" :position-ms="positionMs ?? currentLine.startMs" :reduced-motion="reducedMotion" class="text-[clamp(24px,4vw,42px)]"
-                :agent-name="currentLine.agentId ? agents?.[currentLine.agentId]?.name ?? currentLine.agentId : undefined" />
+              <LyricAnnotations
+                v-if="current"
+                :line="currentLine"
+                :position-ms="positionMs ?? currentLine.startMs"
+                :reduced-motion="reducedMotion"
+                class="text-[clamp(24px,4vw,42px)]"
+                :agent-name="
+                  currentLine.agentId
+                    ? (agents?.[currentLine.agentId]?.name ??
+                      currentLine.agentId)
+                    : undefined
+                "
+              />
               <p
                 v-if="!showcase"
                 class="mt-2.5 text-label text-stage-muted max-sm:hidden"
@@ -207,7 +231,11 @@ const { enter, leave, cancel } = useLyricTransitions(() => ({
             :line="currentLine"
             :position-ms="positionMs ?? currentLine.startMs"
             :reduced-motion="reducedMotion"
-            :agent-name="currentLine.agentId ? agents?.[currentLine.agentId]?.name ?? currentLine.agentId : undefined"
+            :agent-name="
+              currentLine.agentId
+                ? (agents?.[currentLine.agentId]?.name ?? currentLine.agentId)
+                : undefined
+            "
           />
         </div>
       </Transition>

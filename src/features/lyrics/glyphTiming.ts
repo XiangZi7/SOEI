@@ -44,11 +44,14 @@ export function buildGlyphTimings(
     return
 
   if (line.timing === 'line') return
-  const words = line.words?.flatMap<LyricWord>(word =>
-    word.syllables?.length && word.syllables.map(syllable => syllable.text).join('') === word.text
-      ? word.syllables
-      : [word]
-  ).filter(word => word.text.length)
+  const words = line.words
+    ?.flatMap<LyricWord>(word =>
+      word.syllables?.length &&
+      word.syllables.map(syllable => syllable.text).join('') === word.text
+        ? word.syllables
+        : [word]
+    )
+    .filter(word => word.text.length)
   if (!words?.length) return
   const spans: WordSpan[] = []
   let textCursor = 0

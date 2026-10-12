@@ -55,6 +55,18 @@ function setup(positionMs = 2000) {
 }
 
 describe('歌词时间轴与节点生命周期', () => {
+  it('暂停在句首后进入或切换场景仍完整显示主歌词', async () => {
+    const stage = surface()
+    const { options, scope, controller } = setup(1000)
+    options.animated = false
+    controller.enter(stage.dom, vi.fn())
+    expect(stage.glyphs.map(glyph => glyph.style.opacity)).toEqual(['1', '1'])
+    expect(stage.glyphs[0]!.style.getPropertyValue('--lyric-fill')).toBe('0%')
+    options.positionMs = 2000
+    await nextTick()
+    expect(stage.glyphs[0]!.style.getPropertyValue('--lyric-fill')).toBe('50%')
+    scope.stop()
+  })
   it('从句中进入时立即显示对应帧，同句回拖直接恢复词高亮', async () => {
     const stage = surface()
     const { options, scope, controller } = setup()

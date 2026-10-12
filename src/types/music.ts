@@ -95,15 +95,9 @@ export interface LyricLine {
   renderHints?: LyricRenderHints
 }
 export type LyricFormat =
-  | 'lrc'
-  | 'enhanced-lrc'
-  | 'vtt'
-  | 'ttml'
-  | 'yrc'
-  | 'qrc'
-  | 'krc'
-  | 'awlrc'
-export type SubtitleContentMode = 'translation' | 'romanization' | 'both' | 'none'
+  'lrc' | 'enhanced-lrc' | 'vtt' | 'ttml' | 'yrc' | 'qrc' | 'krc' | 'awlrc'
+export type SubtitleContentMode =
+  'translation' | 'romanization' | 'both' | 'none'
 export interface LyricDocument {
   lines: LyricLine[]
   format: LyricFormat

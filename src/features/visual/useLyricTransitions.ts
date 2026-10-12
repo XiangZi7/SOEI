@@ -22,6 +22,7 @@ interface LyricScene {
   plan: LyricMotionPlan
   trackId: string
   positionMs: number
+  staticMotion: boolean
   glyphs: { element: HTMLElement; direction: { x: number; y: number } }[]
   camera: HTMLElement | null
   ink: SVGElement[]
@@ -55,7 +56,7 @@ export function useLyricTransitions(options: () => MotionOptions) {
         index,
         time,
         direction,
-        current.reducedMotion
+        current.reducedMotion || scene.staticMotion
       )
       const opacity = String(frame.opacity)
       const transform = `translate3d(${frame.x}px, ${frame.y}px, 0) scale(${frame.scale})`
@@ -71,10 +72,17 @@ export function useLyricTransitions(options: () => MotionOptions) {
       }
     }
     if (scene.camera) {
-      const frame = lyricCameraFrame(scene.plan, time, current.reducedMotion)
+      const frame = lyricCameraFrame(
+        scene.plan,
+        time,
+        current.reducedMotion || scene.staticMotion
+      )
       scene.camera.style.transform = `translate3d(${frame.x}px, ${frame.y}px, 0) scale(${frame.scale})`
     }
-    const ink = current.reducedMotion ? 1 : lyricInkProgress(scene.plan, time)
+    const ink =
+      current.reducedMotion || scene.staticMotion
+        ? 1
+        : lyricInkProgress(scene.plan, time)
     for (const element of scene.ink) {
       element.style.strokeDasharray = '100'
       element.style.strokeDashoffset = String(100 * (1 - ink))
@@ -105,7 +113,10 @@ export function useLyricTransitions(options: () => MotionOptions) {
     const plan = planLyricMotion({
       line: current.line,
       endMs: current.endMs,
-      glyphs: glyphs.map(glyph => glyph.element.dataset.lyricText ?? glyph.element.textContent ?? ''),
+      glyphs: glyphs.map(
+        glyph =>
+          glyph.element.dataset.lyricText ?? glyph.element.textContent ?? ''
+      ),
       layout: current.layout,
       variant: current.variant,
     })
@@ -115,6 +126,7 @@ export function useLyricTransitions(options: () => MotionOptions) {
       plan,
       trackId: current.trackId,
       positionMs: current.positionMs,
+      staticMotion: !current.animated,
       glyphs,
       camera: element.querySelector<HTMLElement>('.shot-camera'),
       ink: Array.from(element.querySelectorAll<SVGElement>('.lyric-ink')),

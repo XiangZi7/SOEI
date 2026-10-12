@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns:itunes="http://music.apple.com/lyric-ttml-internal" xmlns:tts="http://www.w3.org/ns/ttml#styling" itunes:timing="Word">
+  <head><metadata><ttm:agent type="person" xml:id="lead"><ttm:name>SOEI</ttm:name></ttm:agent><ttm:agent type="person" xml:id="harmony"><ttm:name>和声声部</ttm:name></ttm:agent></metadata></head>
+  <body dur="00:36.000"><div itunes:songPart="Chorus">
+    <p begin="00:00.000" end="00:04.000" ttm:agent="lead"><span begin="00:00.000" end="00:01.800">把声音</span><span begin="00:01.800" end="00:03.600">交给此刻</span><span ttm:role="x-translation" xml:lang="en">Let the sound belong to this moment.</span><span ttm:role="x-roman" xml:lang="zh-Latn">ba sheng yin jiao gei ci ke</span></p>
+    <p begin="00:04.000" end="00:08.000" ttm:agent="lead"><span begin="00:04.000" end="00:05.800">让窗外的风</span><span begin="00:05.800" end="00:07.600">慢慢经过</span><span ttm:role="x-translation" xml:lang="en">Let the wind pass slowly.</span></p>
+    <p begin="00:08.000" end="00:12.000" ttm:agent="lead"><span begin="00:08.000" end="00:11.600">一束光落在安静角落</span></p>
+    <p begin="00:12.000" end="00:16.000" ttm:agent="lead"><span begin="00:12.000" end="00:15.600">每个节拍都有回应</span></p>
+    <p begin="00:16.000" end="00:20.000" ttm:agent="lead"><span begin="00:16.000" end="00:19.600">暂停，让时间停在这里</span></p>
+    <p begin="00:20.000" end="00:24.000" ttm:agent="lead"><span begin="00:20.000" end="00:23.600">再播放，故事继续前行</span></p>
+    <p begin="00:24.000" end="00:28.000" ttm:agent="lead"><span begin="00:24.000" end="00:25.000">听见</span><span tts:ruby="container"><span tts:ruby="base" begin="00:25.000" end="00:26.000">風</span><span tts:ruby="textContainer"><span tts:ruby="text" begin="00:25.000" end="00:26.000">かぜ</span></span></span><span begin="00:26.000" end="00:27.600">，也听见你</span><span ttm:role="x-bg" begin="00:25.000" end="00:27.000"><span begin="00:25.000" end="00:27.000">光的回声</span><span ttm:role="x-translation" xml:lang="en">echoes of light</span></span><span ttm:role="x-translation" xml:lang="en">Hear the wind, and hear you.</span><span ttm:role="x-roman" xml:lang="zh-Latn">ting jian feng, ye ting jian ni</span></p>
+    <p begin="00:28.000" end="00:32.000" ttm:agent="lead"><span begin="00:28.000" end="00:31.600">向前向后，歌词依然同行</span></p>
+    <p begin="00:32.000" end="00:36.000" ttm:agent="lead"><span begin="00:32.000" end="00:35.600">最后的音符，轻轻落定</span></p>
+  </div></body>
+</tt>

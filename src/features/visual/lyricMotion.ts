@@ -44,16 +44,28 @@ export function planLyricMotion({
 }): LyricMotionPlan {
   const durationMs = Math.max(1, endMs - line.startMs)
   const brief = durationMs < 1000
-  const immediate = durationMs < 450 || line.renderHints?.lineTransitionMode === 'none'
+  const immediate =
+    durationMs < 450 || line.renderHints?.lineTransitionMode === 'none'
   const dense = line.text.length > 160
   const available = recipes[layout]
   const recipe =
     brief || dense
       ? 'soft'
       : available[Math.abs(Math.trunc(variant)) % available.length]!
-  const hint = line.renderHints ? getLineTransitionTiming(
-    line.renderHints.rawDurationMs / 1000, line.renderHints.lineTransitionMode, line.renderHints.wordRevealMode) : undefined
-  const enterMs = immediate ? 0 : Math.min(brief ? 160 : 680, durationMs * 0.28, hint ? hint.enterDuration * 1000 : Infinity)
+  const hint = line.renderHints
+    ? getLineTransitionTiming(
+        line.renderHints.rawDurationMs / 1000,
+        line.renderHints.lineTransitionMode,
+        line.renderHints.wordRevealMode
+      )
+    : undefined
+  const enterMs = immediate
+    ? 0
+    : Math.min(
+        brief ? 160 : 680,
+        durationMs * 0.28,
+        hint ? hint.enterDuration * 1000 : Infinity
+      )
   const timings = buildGlyphTimings(line, endMs, glyphs)
   const lastWordEnd = timings
     ? Math.max(line.startMs, ...timings.map(timing => timing.endMs))

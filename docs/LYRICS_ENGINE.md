@@ -1,17 +1,63 @@
 # 歌词引擎：时间轴与分镜
 
-2026-10-09。本次实际读取用户提供的 `D:\code\ck` 中两个仓库，参考其时间模型与模块边界，在 SOEI 现有 Vue / Tauri 架构内独立实现。
+2026-10-12。按用户确认的「完整引擎及渲染模型、毫秒富模型、8 种格式、沿用 Folia 依赖」范围，从本地 `D:\code\ck\folia-major` 移植纯逻辑，保留 SOEI 原有播放时钟、字素安全校验和 Vue / Tauri 结构。
 
-## 源码对照
+## 当前导入与解析
 
-| 参考 | 实际阅读的源码 | SOEI 的实现 |
-| --- | --- | --- |
-| Folia `c69afdcba85fe6ca1f5c9f5cb83be3e83adfcd67` | [temperaMotion.ts](https://github.com/chthollyphile/folia-major/blob/c69afdcba85fe6ca1f5c9f5cb83be3e83adfcd67/src/components/visualizer/tempera/temperaMotion.ts)、[temperaProgram.ts](https://github.com/chthollyphile/folia-major/blob/c69afdcba85fe6ca1f5c9f5cb83be3e83adfcd67/src/components/visualizer/tempera/temperaProgram.ts) | 由绝对播放时间计算动效；词时间与入场、停留、退场时间分离，Seek 无需重演历史帧 |
-| Folia 字素时间模型 | [graphemeTiming.ts](https://github.com/chthollyphile/folia-major/blob/c69afdcba85fe6ca1f5c9f5cb83be3e83adfcd67/src/utils/lyrics/graphemeTiming.ts) | 保留 Enhanced LRC 词边界，词内以完整字素均分，保护组合音标和 ZWJ emoji；未标时标点不独占演唱区间 |
-| JIZURA `fc16bfe43ea4a6c25a21f1caf04d17326de14f00` | [05_anim.js](https://github.com/852wa/JIZURA/blob/fc16bfe43ea4a6c25a21f1caf04d17326de14f00/src/05_anim.js)、[05b_registry.js](https://github.com/852wa/JIZURA/blob/fc16bfe43ea4a6c25a21f1caf04d17326de14f00/src/05b_registry.js) | 布局与动效解耦，提供轻移、遮罩、轻缩放、抬升四种克制组合，镜头持留采用两端归零的包络 |
-| JIZURA 规划与渲染 | [08_planner.js](https://github.com/852wa/JIZURA/blob/fc16bfe43ea4a6c25a21f1caf04d17326de14f00/src/08_planner.js)、[09_render.js](https://github.com/852wa/JIZURA/blob/fc16bfe43ea4a6c25a21f1caf04d17326de14f00/src/09_render.js) | 按句子时长和文本长度限制动效；预先规划，再按局部播放时间求值。SOEI 使用更长的阅读预算，不采用上游估算节拍覆盖真实词时间 |
+| 格式         | 导入形式                                       | 时间信息                                                 |
+| ------------ | ---------------------------------------------- | -------------------------------------------------------- |
+| LRC          | `.lrc`                                         | 行时间，重复标签、BOM、文件 offset                       |
+| Enhanced-LRC | `.lrc`，角括号或行内方括号时间                 | 精确词时间、句尾时间标签                                 |
+| VTT          | `.vtt`                                         | cue 开始/结束，移除 cue 标记                             |
+| TTML         | `.ttml`                                        | 行、词、音节、ruby、翻译、罗马音、背景和声、演唱者及副歌 |
+| YRC          | `.yrc`                                         | 绝对词时间与时长                                         |
+| QRC          | `.qrc`，解密后的文本或 `LyricContent` XML 容器 | 绝对词时间与时长                                         |
+| KRC          | `.krc`，明文或 `krc1` 二进制                   | 相对词时间、内嵌语言标签；XOR 解密及 zlib 解压           |
+| AWLRC        | `.awlrc`                                       | LX 容器的行开始时间与相对词时间                          |
 
-Folia 为 AGPL-3.0，JIZURA 为 MIT（2026 hakoniwa）。未复制二者源码或媒体素材；本次没有引入二者依赖或构建系统。
+浏览器与 Tauri 的歌词选择器均接受以上文件。同名 sidecar 自动关联；原生端保留原来的 LRC 优先级并支持大写扩展名。原生 IPC 传递 `{ name, bytes }`，不提前将 KRC 或旧编码文件转成 UTF-8。前端共享 UTF-8、UTF-16 BOM 和 GB18030/GBK 解码；原始文件与 KRC 解压结果均限制为 2 MB。QRC 的在线 provider 加密数据和在线歌词抓取不属于本地文件导入接口。
+
+`parser.ts` 负责格式检测和公开解析接口；`lrc.ts` 保留原有严格时间验证。合并在一个 LRC 时间轴内的字幕可拆成原文、翻译和罗马音，外部显式字幕优先；字幕采用最近的一对一匹配。间奏通过 `includeInterludes` 显式启用，默认关闭。TTML 会为缺少 Apple key 的标准行补充唯一标识，并兼容 TTML 元素的命名空间前缀。
+
+## 富模型与时间边界
+
+`types/music.ts` 中的 `LyricDocument`、`LyricLine`、`LyricWord`、`LyricSyllable`、`LyricRuby` 和 `LyricBackgroundVocal` 均使用 `startMs/endMs`。动效提示使用 `rawDurationMs/renderEndMs`。模型保留 alternateTexts 的语言、声部、songPart、blockIndex、isChorus 以及可选的 wordSegments。
+
+隔离在 `features/lyrics/folia/` 的原算法仍使用秒，`adapter.ts` 是唯一的数据模型转换边界；组件 props、播放状态和歌词偏移统一使用毫秒。转换发生在解析或布局编译阶段，不在每帧转换整首歌词。AMLL 自带的毫秒音节时间先经过上游转换，再由边界适配器恢复 SOEI 的毫秒模型，回归测试验证嵌套 ruby 和和声没有单位漂移。
+
+普通 LRC、VTT 和行级 TTML 不会暴露解析器生成的估计词时间。混合普通/逐词歌词时，每一行独立标记 `timing`，只有真实的词时间参与演唱高亮。`glyphTiming.ts` 保留原有 Unicode 与标点校验，并优先使用 TTML 音节边界。
+
+## Vue 渲染接入
+
+- `renderModel.ts`：将 Monet 的显示 token、测量字宽、扫光边缘与发光包络适配为毫秒接口；时间数组在 token 编译时缓存。
+- `LyricRail.vue`：叙事模式的等待/活动/已完成行窗口；布局测量缓存最多 240 项，字体完成加载时失效。行的真实 DOM 尺寸只在内容、容器或字体改变时读取。活动长行按容器缩放以保留全文。
+- `TimedLyricText.vue` 与 `useLyricSweep.ts`：显示完整文本及 ruby；播放时只更新扫光、发光和词状态。暂停与 Seek 直接求当前位置，组件销毁后不再写入节点。
+- `LyricAnnotations.vue`：活动行的罗马音、翻译、演唱者、副歌和独立时间轴和声。
+- `layout.ts`、`lyricStoryboard.ts` 与 `KineticLyrics.vue`：接入多层句子断行、CJK 语义单元和粘连标点。边界必须符合原始词/语义单元与完整字素；多字注音合成一个显示单元，文字连接后仍等于原文。
+- `lyricMotion.ts`：在原有阅读预算内应用 normal/short/micro 动效提示。暂停在句首重新进入或切换构图时完整显示文字，仍按真实时间显示词进度。
+
+叙事模式支持鼠标滚动及上下方向键浏览，停止操作 1.8 秒后回到当前歌词；点击任意歌词行定位媒体时间，扣除全局及歌曲专属偏移。减少动态效果时停止位移/发光，保留词进度。
+
+## 移植来源与许可
+
+实际移植的 Folia 版本为 `c69afdcba85fe6ca1f5c9f5cb83be3e83adfcd67`。解析、排版、动效提示及 Monet 纯模型保留 AGPL-3.0 来源；AMLL TTML 依赖为 AGPL-3.0-only，xmldom/pretext/fflate 为 MIT。具体文件与完整许可见 [移植声明](../third_party/Folia-NOTICE.md)、[Folia 许可证](../third_party/Folia-LICENSE.txt) 和 [来源说明](SOURCES.md)。此次没有复制 React UI 或媒体素材。
+
+## 验证
+
+新增格式/富模型/解码/扫光测试，并移植 Folia 的解析、CJK、断句、字素、分词和双字幕测量回归。原有播放时钟、暂停、Seek、异步换歌和歌词导入竞争测试继续保留。Rust 覆盖大小写 sidecar、优先级及二进制歌词无损传输。
+
+浏览器通过现有导入入口载入 `tests/fixtures/rich-lyrics.ttml`，已观察叙事与手书场景中的注音、双字幕、和声和副歌；歌词行点击定位、暂停句首重入和控制台错误检查均已验证。自制测试音频不含人声，测试歌词时间为编排结果。Windows 音频设备测试与多屏壁纸仍按 [实施记录](IMPLEMENTATION.md) 的实机验收项处理。
+
+## 此前时间轴的源码参考（2026-10-09）
+
+| 参考                                              | 实际阅读的源码                                                                                                                                                                                                                                                                                                                         | SOEI 的实现                                                                                                             |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Folia `c69afdcba85fe6ca1f5c9f5cb83be3e83adfcd67`  | [temperaMotion.ts](https://github.com/chthollyphile/folia-major/blob/c69afdcba85fe6ca1f5c9f5cb83be3e83adfcd67/src/components/visualizer/tempera/temperaMotion.ts)、[temperaProgram.ts](https://github.com/chthollyphile/folia-major/blob/c69afdcba85fe6ca1f5c9f5cb83be3e83adfcd67/src/components/visualizer/tempera/temperaProgram.ts) | 由绝对播放时间计算动效；词时间与入场、停留、退场时间分离，Seek 无需重演历史帧                                           |
+| Folia 字素时间模型                                | [graphemeTiming.ts](https://github.com/chthollyphile/folia-major/blob/c69afdcba85fe6ca1f5c9f5cb83be3e83adfcd67/src/utils/lyrics/graphemeTiming.ts)                                                                                                                                                                                     | 保留 Enhanced LRC 词边界，词内以完整字素均分，保护组合音标和 ZWJ emoji；未标时标点不独占演唱区间                        |
+| JIZURA `fc16bfe43ea4a6c25a21f1caf04d17326de14f00` | [05_anim.js](https://github.com/852wa/JIZURA/blob/fc16bfe43ea4a6c25a21f1caf04d17326de14f00/src/05_anim.js)、[05b_registry.js](https://github.com/852wa/JIZURA/blob/fc16bfe43ea4a6c25a21f1caf04d17326de14f00/src/05b_registry.js)                                                                                                       | 布局与动效解耦，提供轻移、遮罩、轻缩放、抬升四种克制组合，镜头持留采用两端归零的包络                                    |
+| JIZURA 规划与渲染                                 | [08_planner.js](https://github.com/852wa/JIZURA/blob/fc16bfe43ea4a6c25a21f1caf04d17326de14f00/src/08_planner.js)、[09_render.js](https://github.com/852wa/JIZURA/blob/fc16bfe43ea4a6c25a21f1caf04d17326de14f00/src/09_render.js)                                                                                                       | 按句子时长和文本长度限制动效；预先规划，再按局部播放时间求值。SOEI 使用更长的阅读预算，不采用上游估算节拍覆盖真实词时间 |
+
+2026-10-09 的独立时间轴实现未复制 Folia 或 JIZURA 源码。2026-10-12 的本次移植已实际复制并适配 Folia 的纯模块；JIZURA 仍为算法与构图参考，未复制源码或素材。
 
 ## 数据与组件边界
 

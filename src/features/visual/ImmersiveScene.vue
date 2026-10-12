@@ -25,8 +25,14 @@ const props = defineProps<{
 }>()
 defineEmits<{ queue: []; fullscreen: []; close: [] }>()
 const store = useMusicStore()
-const { activeTrack, previewTrack, lyrics, lyricDocument, snapshot, preferences } =
-  storeToRefs(store)
+const {
+  activeTrack,
+  previewTrack,
+  lyrics,
+  lyricDocument,
+  snapshot,
+  preferences,
+} = storeToRefs(store)
 const systemMotion = usePreferredReducedMotion()
 const scene = useTemplateRef<HTMLElement>('scene')
 const visible = useElementVisibility(scene)
@@ -195,7 +201,19 @@ function volume(event: Event) {
       :energy="preview ? [] : snapshot.energy"
       :wallpaper-cover="wallpaperCover"
       :agents="preview ? undefined : lyricDocument.ttml?.agents"
-      @seek="position => { if (!preview) void seek(Math.max(0, position - preferences.lyricOffset - (track ? preferences.trackOffsets[track.id] ?? 0 : 0))) }"
+      @seek="
+        position => {
+          if (!preview)
+            void seek(
+              Math.max(
+                0,
+                position -
+                  preferences.lyricOffset -
+                  (track ? (preferences.trackOffsets[track.id] ?? 0) : 0)
+              )
+            )
+        }
+      "
     >
       <template
         v-if="!showcase"
