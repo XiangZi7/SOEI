@@ -2,7 +2,8 @@ import { computed, reactive, toRefs, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { call, desktop, errorMessage, onNative } from '../bridge/native'
 import { demoTracks } from '../features/library/demo'
-import { parseLrc } from '../features/lyrics/lrc'
+import { isLyricFilename, parseLyrics } from '../features/lyrics/parser'
+import { decodeLyricSource, readLyricFile } from '../features/lyrics/fileDecoding'
 import {
   playbackTestLyrics,
   playbackTestTrack,
@@ -10,6 +11,8 @@ import {
 import type {
   Display,
   LibraryTab,
+  LyricFileSource,
+  LyricDocument,
   PlaybackSnapshot,
   Preferences,
   ScanProgress,
@@ -70,6 +73,7 @@ export const useMusicStore = defineStore('music', () => {
     preferences: { ...defaultPreferences } as Preferences,
     // 歌词文本
     lyricText: '',
+    lyricFilename: '',
     // 导入进度
     scan: {
       running: false,
@@ -113,7 +117,17 @@ export const useMusicStore = defineStore('music', () => {
     () =>
       state.demos.find(track => track.id === state.previewId) ?? state.demos[7]!
   )
-  const lyrics = computed(() => parseLrc(state.lyricText))
+  const lyricDocument = computed<LyricDocument>(() => {
+    try {
+      return parseLyrics(state.lyricText, {
+        filename: state.lyricFilename,
+        durationMs: activeTrack.value?.durationMs,
+      })
+    } catch (error) {
+      return { lines: [], format: 'lrc' as const, isWordByWord: false, error: errorMessage(error) }
+    }
+  })
+  const lyrics = computed(() => lyricDocument.value.lines)
   const queueTracks = computed(() =>
     state.snapshot.queue
       .map(id => state.realTracks.find(track => track.id === id))
@@ -229,17 +243,22 @@ export const useMusicStore = defineStore('music', () => {
   async function loadLyrics(id: string | null) {
     const request = ++lyricRequest
     state.lyricText = ''
+    state.lyricFilename = ''
     if (!id) return
     try {
       if (desktop) {
-        const [track, text] = await call<[Track, string | null]>(
+        const [track, source] = await call<[Track, LyricFileSource | null]>(
           'scene_track',
           { id }
         )
         if (request !== lyricRequest) return
         upsert(track)
-        state.lyricText = text ?? ''
-      } else state.lyricText = browserLyrics.get(id) ?? ''
+        state.lyricText = decodeLyricSource(source)
+        state.lyricFilename = typeof source === 'object' && source ? source.name : track.lyricRef ?? ''
+      } else {
+        state.lyricText = browserLyrics.get(id) ?? ''
+        state.lyricFilename = state.realTracks.find(track => track.id === id)?.lyricRef ?? ''
+      }
     } catch (error) {
       if (request === lyricRequest) report(error)
     }
@@ -466,13 +485,15 @@ export const useMusicStore = defineStore('music', () => {
     if (state.snapshot.trackId === id) {
       ++lyricRequest
       state.lyricText = text
+      state.lyricFilename = name
     }
   }
   async function importBrowserFiles(files: FileList | null) {
     if (!files) return
     const selected = Array.from(files)
-    for (const file of selected.filter(file => /\.lrc$/i.test(file.name))) {
-      const text = await file.text()
+    for (const file of selected.filter(file => isLyricFilename(file.name))) {
+      const text = await readLyricFile(file)
+      parseLyrics(text, { filename: file.name })
       browserSidecars.set(sidecarKey(file.name), { text, name: file.name })
     }
     for (const file of selected) {
@@ -503,21 +524,26 @@ export const useMusicStore = defineStore('music', () => {
     state.notice = '音乐与同名歌词已导入本次预览'
   }
   async function importBrowserLyrics(file: File, id: string) {
-    const text = await file.text()
+    const text = await readLyricFile(file)
+    const parsed = parseLyrics(text, { filename: file.name })
     attachBrowserLyrics(id, text, file.name)
-    state.notice = `已导入 ${parseLrc(text).length} 句歌词`
+    state.notice = `已导入 ${parsed.lines.length} 句歌词`
   }
   async function importLyrics() {
     const id = activeTrack.value?.id
     if (!id) return
     try {
-      const text = await call<string | null>('lyrics_import', { id })
-      if (text !== null) {
+      const source = await call<LyricFileSource | null>('lyrics_import', { id })
+      if (source !== null) {
+        const text = decodeLyricSource(source)
+        const filename = typeof source === 'object' ? source.name : state.realTracks.find(track => track.id === id)?.lyricRef ?? ''
+        const parsed = parseLyrics(text, { filename })
         if (state.snapshot.trackId === id) {
           ++lyricRequest
           state.lyricText = text
+          state.lyricFilename = filename
         }
-        state.notice = `已导入 ${parseLrc(text).length} 句歌词`
+        state.notice = `已导入 ${parsed.lines.length} 句歌词`
       }
     } catch (error) {
       report(error)
@@ -577,6 +603,7 @@ export const useMusicStore = defineStore('music', () => {
     activeTrack,
     previewTrack,
     lyrics,
+    lyricDocument,
     queueTracks,
     initialize,
     flushPreferences,

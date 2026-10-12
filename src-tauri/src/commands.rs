@@ -215,7 +215,10 @@ pub async fn player_command(
     .map_err(|error| AppError::new("AUDIO_TASK", error))?
 }
 #[tauri::command]
-pub fn scene_track(state: State<AppState>, id: String) -> AppResult<(Track, Option<String>)> {
+pub fn scene_track(
+    state: State<AppState>,
+    id: String,
+) -> AppResult<(Track, Option<library::LyricFileSource>)> {
     let track = state.storage.track(&id)?;
     let lyrics = library::read_lyrics(&track)?;
     Ok((track, lyrics))
@@ -225,12 +228,12 @@ pub async fn lyrics_import(
     window: WebviewWindow,
     app: AppHandle,
     id: String,
-) -> AppResult<Option<String>> {
+) -> AppResult<Option<library::LyricFileSource>> {
     control_window(&window)?;
     tauri::async_runtime::spawn_blocking(move || {
         let Some(path) = rfd::FileDialog::new()
-            .set_title("选择 LRC 歌词")
-            .add_filter("歌词", &["lrc"])
+            .set_title("选择歌词")
+            .add_filter("歌词", library::LYRIC_EXTENSIONS)
             .pick_file()
         else {
             return Ok(None);

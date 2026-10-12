@@ -2,6 +2,8 @@
 import { computed, nextTick, reactive, useTemplateRef, watch } from 'vue'
 import { useEventListener, useResizeObserver } from '@vueuse/core'
 import { buildLyricShot, type KineticLayout } from './lyricStoryboard'
+import type { LyricLine } from '../../types/music'
+import LyricAnnotations from './LyricAnnotations.vue'
 
 const props = defineProps<{
   text: string
@@ -10,6 +12,10 @@ const props = defineProps<{
   layout: KineticLayout
   seed: number
   showcase?: boolean
+  line?: LyricLine
+  positionMs?: number
+  reducedMotion?: boolean
+  agentName?: string
 }>()
 const shot = computed(() =>
   buildLyricShot(
@@ -17,7 +23,8 @@ const shot = computed(() =>
     props.text,
     props.trackId,
     props.index,
-    props.seed
+    props.seed,
+    props.line,
   )
 )
 const container = useTemplateRef<HTMLElement>('container')
@@ -137,9 +144,7 @@ watch(
                     : 'text-[1.1em]'
                 : ''
             "
-            ><span class="lyric-glyph inline-block whitespace-pre-wrap">{{
-              glyph
-            }}</span></span
+            ><span class="lyric-glyph inline-block whitespace-pre-wrap" :data-lyric-text="glyph"><ruby v-if="fragment.ruby[glyphIndex]">{{ glyph }}<rt>{{ fragment.ruby[glyphIndex] }}</rt></ruby><template v-else>{{ glyph }}</template></span></span
           >
           <svg
             v-if="fragment.emphasis && layout === 'manuscript'"
@@ -162,6 +167,7 @@ watch(
             class="absolute -top-2.5 left-[13%] h-4 w-13 -rotate-6 bg-stage-muted/25"
           />
         </p>
+        <LyricAnnotations v-if="line" :line="line" :position-ms="positionMs ?? line.startMs" :reduced-motion="reducedMotion" :agent-name="agentName" class="self-center text-center" />
       </div>
       <span
         v-if="layout === 'montage'"
@@ -174,6 +180,7 @@ watch(
 </template>
 
 <style scoped>
+rt { font-size: .42em; font-weight: 400; }
 .lyric-glyph[data-timed] {
   background-image: linear-gradient(
     90deg,

@@ -34,6 +34,51 @@ pub fn supported(path: &Path) -> bool {
         })
 }
 
+pub const LYRIC_EXTENSIONS: &[&str] = &["lrc", "ttml", "yrc", "qrc", "krc", "vtt", "awlrc"];
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LyricFileSource {
+    pub name: String,
+    pub bytes: Vec<u8>,
+}
+
+fn find_lyric_sidecar(audio: &Path) -> Option<PathBuf> {
+    let stem = audio.file_stem()?.to_string_lossy();
+    let entries = std::fs::read_dir(audio.parent()?).ok()?;
+    let mut candidates: Vec<PathBuf> = entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.is_file()
+                && path
+                    .file_stem()
+                    .is_some_and(|part| part.to_string_lossy().eq_ignore_ascii_case(&stem))
+                && path
+                    .extension()
+                    .and_then(|part| part.to_str())
+                    .is_some_and(|part| {
+                        LYRIC_EXTENSIONS.contains(&part.to_ascii_lowercase().as_str())
+                    })
+        })
+        .collect();
+    candidates.sort_by_key(|path| {
+        let extension = path
+            .extension()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_ascii_lowercase();
+        (
+            LYRIC_EXTENSIONS
+                .iter()
+                .position(|part| *part == extension)
+                .unwrap_or(usize::MAX),
+            path.to_string_lossy().into_owned(),
+        )
+    });
+    candidates.into_iter().next()
+}
+
 fn read_track(path: &Path, cache: &Path) -> AppResult<Track> {
     let canonical = path.canonicalize()?;
     let id = blake3::hash(canonical.to_string_lossy().to_lowercase().as_bytes())
@@ -69,7 +114,7 @@ fn read_track(path: &Path, cache: &Path) -> AppResult<Track> {
             }
         }
     }
-    let lyric_path = canonical.with_extension("lrc");
+    let lyric_path = find_lyric_sidecar(&canonical);
     Ok(Track {
         id,
         local_path: canonical.to_string_lossy().into_owned(),
@@ -82,9 +127,7 @@ fn read_track(path: &Path, cache: &Path) -> AppResult<Track> {
             .unwrap_or_else(|| "未分类".into()),
         duration_ms: media.properties().duration().as_millis() as u64,
         cover_ref,
-        lyric_ref: lyric_path
-            .is_file()
-            .then(|| lyric_path.to_string_lossy().into_owned()),
+        lyric_ref: lyric_path.map(|path| path.to_string_lossy().into_owned()),
         favorite: false,
         last_played: None,
     })
@@ -178,19 +221,25 @@ pub fn scan(app: AppHandle, paths: Vec<PathBuf>) {
     let _ = app.emit_to("main", "library:scan-progress", progress);
 }
 
-pub fn read_lyrics(track: &Track) -> AppResult<Option<String>> {
+pub fn read_lyrics(track: &Track) -> AppResult<Option<LyricFileSource>> {
     let Some(path) = &track.lyric_ref else {
         return Ok(None);
     };
     if std::fs::metadata(path)?.len() > 2 * 1024 * 1024 {
         return Err(AppError::new("LYRIC_SIZE", "歌词文件超过 2 MB"));
     }
-    std::fs::read_to_string(path).map(Some).map_err(|error| {
-        AppError::new(
-            "LYRIC_ENCODING",
-            format!("请使用 UTF-8 编码的歌词：{error}"),
-        )
-    })
+    let bytes = std::fs::read(path)?;
+    if bytes.len() > 2 * 1024 * 1024 {
+        return Err(AppError::new("LYRIC_SIZE", "歌词文件超过 2 MB"));
+    }
+    Ok(Some(LyricFileSource {
+        name: Path::new(path)
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned(),
+        bytes,
+    }))
 }
 
 pub fn create_test_track(directory: &Path, cache: &Path) -> AppResult<Track> {
@@ -229,7 +278,8 @@ mod tests {
         let track = create_test_track(&directory, &directory).expect("create bundled test");
         assert_eq!(track.duration_ms, 36_000);
         assert_eq!(track.title, "光的回声 · 播放测试");
-        let text = read_lyrics(&track).unwrap().unwrap();
+        let source = read_lyrics(&track).unwrap().unwrap();
+        let text = String::from_utf8(source.bytes).unwrap();
         assert!(text.contains("[00:24.00]<00:24.00>拖动进度，"));
         assert_eq!(
             text.as_bytes(),
@@ -253,10 +303,11 @@ mod tests {
         let track = read_track(&root.join("测试音楽.wav"), &root).expect("index PCM WAV");
         assert_eq!(track.title, "测试音楽");
         assert_eq!(track.duration_ms, 12_000);
-        assert!(read_lyrics(&track)
-            .unwrap()
-            .unwrap()
-            .contains("Hello, world."));
+        assert!(
+            String::from_utf8(read_lyrics(&track).unwrap().unwrap().bytes)
+                .unwrap()
+                .contains("Hello, world.")
+        );
         assert_eq!(
             track.id,
             read_track(&root.join("./测试音楽.wav"), &root).unwrap().id

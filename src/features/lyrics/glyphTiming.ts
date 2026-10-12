@@ -1,4 +1,4 @@
-import type { LyricLine } from '../../types/music'
+import type { LyricLine, LyricWord } from '../../types/music'
 
 export interface GlyphTiming {
   startMs: number
@@ -43,7 +43,12 @@ export function buildGlyphTimings(
   )
     return
 
-  const words = line.words?.filter(word => word.text.length)
+  if (line.timing === 'line') return
+  const words = line.words?.flatMap<LyricWord>(word =>
+    word.syllables?.length && word.syllables.map(syllable => syllable.text).join('') === word.text
+      ? word.syllables
+      : [word]
+  ).filter(word => word.text.length)
   if (!words?.length) return
   const spans: WordSpan[] = []
   let textCursor = 0

@@ -231,7 +231,7 @@ async function applyShortcuts(clear = false) {
               ><AppIcon
                 name="file-text"
                 :size="14"
-              />导入 LRC</UiButton
+              />导入歌词</UiButton
             ></SettingRow
           >
         </template>

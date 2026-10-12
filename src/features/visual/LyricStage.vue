@@ -6,6 +6,9 @@ import type { LyricLine, SceneLayout, Track } from '../../types/music'
 import Artwork from '../../components/ui/Artwork.vue'
 import { isKineticLayout, shotVariant } from './lyricStoryboard'
 import { useLyricTransitions } from './useLyricTransitions'
+import LyricRail from './LyricRail.vue'
+import LyricAnnotations from './LyricAnnotations.vue'
+import TimedLyricText from './TimedLyricText.vue'
 
 const props = defineProps<{
   track: Track | null
@@ -20,7 +23,9 @@ const props = defineProps<{
   wallpaperCover?: boolean
   energy?: number[]
   showcase?: boolean
+  agents?: Record<string, { name?: string }>
 }>()
+const emit = defineEmits<{ seek: [positionMs: number] }>()
 const currentLine = computed(
   () => props.lines[props.index] ?? { id: 'empty', startMs: 0, text: '' }
 )
@@ -28,16 +33,10 @@ const current = computed(() => currentLine.value.text)
 const previous = computed(() => props.lines[props.index - 1]?.text ?? '')
 const next = computed(() => props.lines[props.index + 1]?.text ?? '')
 const kinetic = computed(() => isKineticLayout(props.layout))
-const readingLines = computed(() =>
-  props.lines.slice(
-    Math.max(0, props.index - 1),
-    Math.max(0, props.index - 1) + 4
-  )
-)
 const lineEndMs = computed(() =>
   Math.max(
     currentLine.value.startMs + 1,
-    props.lines[props.index + 1]?.startMs ??
+    currentLine.value.endMs ?? props.lines[props.index + 1]?.startMs ??
       (props.durationMs && props.durationMs > currentLine.value.startMs
         ? props.durationMs
         : currentLine.value.startMs + 4000)
@@ -104,6 +103,10 @@ const { enter, leave, cancel } = useLyricTransitions(() => ({
           ><slot name="cover-window"
         /></template> </CoverComposition
     ></Transition>
+    <LyricRail v-else-if="layout === 'readable' && lines.length" :lines="lines" :index="index"
+      :position-ms="positionMs ?? currentLine.startMs" :duration-ms="durationMs"
+      :reduced-motion="reducedMotion || !animated" :showcase="showcase" :agents="agents"
+      @seek="emit('seek', $event)" />
     <template
       v-else-if="
         layout === 'title' ||
@@ -181,8 +184,10 @@ const { enter, leave, cancel } = useLyricTransitions(() => ({
                     : 'mt-9 text-xl max-sm:mt-4 max-sm:text-base'
                 "
               >
-                {{ current }}
+                <TimedLyricText :line="currentLine" :end-ms="lineEndMs" :position-ms="positionMs ?? currentLine.startMs" :reduced-motion="reducedMotion" />
               </p>
+              <LyricAnnotations v-if="current" :line="currentLine" :position-ms="positionMs ?? currentLine.startMs" :reduced-motion="reducedMotion" class="text-[clamp(24px,4vw,42px)]"
+                :agent-name="currentLine.agentId ? agents?.[currentLine.agentId]?.name ?? currentLine.agentId : undefined" />
               <p
                 v-if="!showcase"
                 class="mt-2.5 text-label text-stage-muted max-sm:hidden"
@@ -190,28 +195,6 @@ const { enter, leave, cancel } = useLyricTransitions(() => ({
                 {{ next }}
               </p>
             </div>
-          </div>
-          <div
-            v-else-if="layout === 'readable'"
-            class="mx-auto w-full max-w-240"
-          >
-            <p
-              v-for="line in readingLines"
-              :key="line.id"
-              class="reading-line leading-normal font-semibold wrap-anywhere"
-              :class="[
-                showcase ? 'my-3' : 'my-4.5 max-sm:my-4',
-                line.id === lines[index]?.id
-                  ? showcase
-                    ? 'text-[28px] text-ink max-sm:text-xl'
-                    : 'text-[clamp(25px,4vw,calc(var(--lyric-size)*1.15))] text-ink max-sm:text-2xl'
-                  : showcase
-                    ? 'text-xl text-stage-muted/55 max-sm:text-base'
-                    : 'text-[clamp(20px,3.2vw,calc(var(--lyric-size)*.85))] text-stage-muted/55 max-sm:text-lg',
-              ]"
-            >
-              {{ line.text }}
-            </p>
           </div>
           <KineticLyrics
             v-else-if="isKineticLayout(layout)"
@@ -221,6 +204,10 @@ const { enter, leave, cancel } = useLyricTransitions(() => ({
             :layout="layout"
             :seed="seed"
             :showcase="showcase"
+            :line="currentLine"
+            :position-ms="positionMs ?? currentLine.startMs"
+            :reduced-motion="reducedMotion"
+            :agent-name="currentLine.agentId ? agents?.[currentLine.agentId]?.name ?? currentLine.agentId : undefined"
           />
         </div>
       </Transition>

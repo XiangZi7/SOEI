@@ -20,7 +20,7 @@ export default ts.config(
       'vue/html-self-closing': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
-        { varsIgnorePattern: '^_' },
+        { varsIgnorePattern: '^_', argsIgnorePattern: '^_' },
       ],
     },
   },

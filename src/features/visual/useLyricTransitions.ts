@@ -105,7 +105,7 @@ export function useLyricTransitions(options: () => MotionOptions) {
     const plan = planLyricMotion({
       line: current.line,
       endMs: current.endMs,
-      glyphs: glyphs.map(glyph => glyph.element.textContent ?? ''),
+      glyphs: glyphs.map(glyph => glyph.element.dataset.lyricText ?? glyph.element.textContent ?? ''),
       layout: current.layout,
       variant: current.variant,
     })

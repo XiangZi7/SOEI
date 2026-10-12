@@ -1,6 +1,7 @@
-import type { SceneLayout } from '../../types/music'
+import type { LyricLine, SceneLayout } from '../../types/music'
 import { lyricFragments } from './sceneModes'
 import { lyricGlyphs } from './lyricText'
+import { buildSemanticFragments, richLyricGlyphs } from '../lyrics/layout'
 
 export type KineticLayout = Exclude<SceneLayout, 'readable' | 'title'>
 
@@ -88,11 +89,14 @@ export function buildLyricShot(
   text: string,
   trackId: string,
   index: number,
-  seed = 0
+  seed = 0,
+  line?: LyricLine,
 ) {
   const variant = shotVariant(trackId, index, seed)
   const placementVariant = variant % 4
-  const pieces = lyricFragments(text)
+  const fallback = lyricFragments(text)
+  const pieces = line ? buildSemanticFragments(line, fallback) : fallback
+  let textOffset = 0
   // 最短的片段作为视觉重心，长句保持完整阅读，最多渲染 160 个独立字素。
   const hero = pieces.reduce(
     (best, piece, position) =>
@@ -118,9 +122,13 @@ export function buildLyricShot(
     outline:
       (layout === 'montage' && variant === 3) ||
       (layout === 'echo' && variant >= 4),
-    fragments: pieces.map((piece, position) => ({
+    fragments: pieces.map((piece, position) => {
+      const units = line && characters ? richLyricGlyphs(line, piece, textOffset) : (characters ? lyricGlyphs(piece) : [piece]).map(text => ({ text, ruby: undefined }))
+      textOffset += piece.length
+      return {
       text: piece,
-      glyphs: characters ? lyricGlyphs(piece) : [piece],
+      glyphs: units.map(unit => unit.text),
+      ruby: units.map(unit => unit.ruby),
       placement: compact
         ? 'self-center'
         : layout === 'echo'
@@ -131,6 +139,6 @@ export function buildLyricShot(
       direction: directions[placementVariant]![position]!,
       emphasis: !compact && position === hero,
       card: layout === 'collage' || (layout === 'montage' && variant === 2),
-    })),
+    }}),
   }
 }

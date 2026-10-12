@@ -530,7 +530,7 @@ onBeforeUnmount(() => {
       class="sr-only"
       tabindex="-1"
       type="file"
-      accept="audio/*,.mp3,.flac,.wav,.ogg,.m4a,.aac,.lrc"
+      accept="audio/*,.mp3,.flac,.wav,.ogg,.m4a,.aac,.lrc,.vtt,.ttml,.yrc,.qrc,.krc,.awlrc"
       multiple
       @change="filesSelected"
     />
@@ -539,7 +539,7 @@ onBeforeUnmount(() => {
       class="sr-only"
       tabindex="-1"
       type="file"
-      accept=".lrc"
+      accept=".lrc,.vtt,.ttml,.yrc,.qrc,.krc,.awlrc"
       @change="lyricsSelected"
     />
   </main>

@@ -16,12 +16,16 @@
     "format:check": "prettier --check src vite.config.ts vitest.config.ts eslint.config.mjs scripts/tauri.mjs"
   },
   "dependencies": {
+    "@applemusic-like-lyrics/ttml": "^1.0.1",
+    "@chenglou/pretext": "^0.0.9",
     "@iconify-json/lucide": "^1.2.141",
     "@iconify/vue": "^5.0.3",
     "@tailwindcss/vite": "^4.3.3",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "@vueuse/core": "^15.0.0",
+    "@xmldom/xmldom": "^0.9.12",
+    "fflate": "^0.8.3",
     "pinia": "^4.0.3",
     "prettier": "^3.9.9",
     "prettier-plugin-tailwindcss": "^0.8.1",

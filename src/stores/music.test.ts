@@ -162,9 +162,9 @@ describe('真实播放状态与每首歌曲的歌词', () => {
     const testTrack = await playTest()
     await store.importBrowserFiles(files(new File(['audio'], '另一首.wav')))
     const other = store.realTracks.find(track => track.id !== testTrack.id)!
-    let finish!: (text: string) => void
+    let finish!: (bytes: ArrayBuffer) => void
     const lyricFile = new File([], 'custom.lrc')
-    vi.spyOn(lyricFile, 'text').mockReturnValue(
+    vi.spyOn(lyricFile, 'arrayBuffer').mockReturnValue(
       new Promise(resolve => {
         finish = resolve
       })
@@ -172,7 +172,7 @@ describe('真实播放状态与每首歌曲的歌词', () => {
     const importing = store.importBrowserLyrics(lyricFile, testTrack.id)
     await store.select(other)
     await nextTick()
-    finish('[00:00]自定义歌词')
+    finish(new TextEncoder().encode('[00:00]自定义歌词').buffer)
     await importing
     expect(store.lyrics).toEqual([])
     await store.select(testTrack)
