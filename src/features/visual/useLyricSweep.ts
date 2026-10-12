@@ -86,6 +86,7 @@ export function useLyricSweep(
     { flush: 'post' }
   )
   useResizeObserver(root, measure)
+  useResizeObserver(() => root.value?.parentElement, measure)
   if (typeof document !== 'undefined') {
     useEventListener(document.fonts, 'loadingdone', () => {
       clearLyricMeasurements()
