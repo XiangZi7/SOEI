@@ -40,6 +40,16 @@
     box-shadow: var(--shadow-panel);
     backdrop-filter: blur(16px);
   }
+  /* 外壳表面（标题栏/侧栏/播放条）：比弹层更透，让氛围层透上来；
+     分隔线统一走 --glass-line，所以封面换色时整套 chrome 一起跟。 */
+  .chrome-surface {
+    background: var(--glass-1);
+    backdrop-filter: var(--glass-blur-1);
+  }
+  .chrome-surface-strong {
+    background: var(--glass-2);
+    backdrop-filter: var(--glass-blur-2);
+  }
   .eyebrow {
     margin: 0;
     font: var(--text-caption) var(--font-serif);

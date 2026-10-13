@@ -7,7 +7,15 @@ import Artwork from '../../components/ui/Artwork.vue'
 import PlaybackSeekBar from './PlaybackSeekBar.vue'
 import PlaybackTransport from './PlaybackTransport.vue'
 
-const props = defineProps<{ preview?: boolean }>()
+const props = withDefaults(
+  defineProps<{
+    preview?: boolean
+    // floating：首页/场景里的悬浮玻璃卡片（原样保留）。
+    // bar：外壳底部的通栏播放条。
+    variant?: 'floating' | 'bar'
+  }>(),
+  { variant: 'floating' }
+)
 defineEmits<{ scene: []; queue: []; fullscreen: [] }>()
 const store = useMusicStore()
 const { activeTrack, previewTrack, snapshot } = storeToRefs(store)
@@ -26,6 +34,7 @@ function volume(event: Event) {
 <template>
   <div
     class="player-bar"
+    :class="{ 'is-bar': variant === 'bar' }"
     role="region"
     aria-label="播放控制"
   >
@@ -160,6 +169,33 @@ function volume(event: Event) {
   align-items: center;
   min-width: 0;
   gap: 0;
+}
+/* 通栏变体：撑满外壳宽度，去掉卡片的圆角与四边描边，只留顶边；
+   传送控制靠 1fr auto 1fr 居中（右端 36px 的全屏键使它偏左 18px，视觉上无感）。 */
+.player-bar.is-bar {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 36px;
+  max-width: none;
+  min-height: var(--spacing-player-bar);
+  margin-inline: 0;
+  padding: 8px 16px;
+  border: 0;
+  border-top: 1px solid var(--glass-line);
+  border-radius: 0;
+  background: var(--glass-2);
+  backdrop-filter: var(--glass-blur-2);
+  box-shadow: none;
+}
+.player-bar.is-bar .player-artwork {
+  width: 54px;
+  height: 54px;
+  border-radius: var(--radius-input);
+}
+.player-bar.is-bar .player-title {
+  font-size: 16px;
+}
+.player-bar.is-bar .player-volume {
+  justify-content: flex-end;
+  padding-left: 0;
 }
 .player-song {
   flex: 1;

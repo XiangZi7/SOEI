@@ -23,6 +23,8 @@
   --color-shadow: #00000066;
   --color-selection: #99bcba4a;
   --color-scrollbar: #b4c3c52b;
+  /* 无边框透明窗口的内描边，配合 AppShell 的圆角勾出窗口轮廓。 */
+  --color-window-ring: #dededb30;
   --font-display:
     'SOEI Cormorant', 'SOEI Mincho', 'Baskerville', 'Iowan Old Style',
     'Palatino Linotype', 'Yu Mincho', 'Noto Serif CJK SC', 'SimSun', serif;
@@ -37,6 +39,11 @@
   --spacing-page: clamp(1.5rem, 5vw, 5rem);
   --radius-input: 4px;
   --radius-panel: 8px;
+  --radius-window: 12px;
+  --spacing-sidebar: 232px;
+  --spacing-sidebar-collapsed: 64px;
+  --spacing-player-bar: 78px;
+  --spacing-side-panel: 320px;
   --shadow-panel: 0 12px 45px #00000040;
   --shadow-dialog: 0 30px 100px #00000080;
   --ease-scene: cubic-bezier(0.22, 1, 0.36, 1);
@@ -45,11 +52,35 @@
 :root {
   --font-serif: var(--font-display);
   --line: var(--color-line);
+  /* 封面取色主题会把它改写成当前封面的点缀色（见 features/theme/cssVariables.ts）；
+     壁纸与设置窗口不挂主题 store，靠这里的默认值兜底。 */
+  --ambient-color: var(--color-ambient-default);
   --opacity-disabled: 0.35;
   --motion-hover: 220ms;
   --motion-controls: 220ms;
   --motion-scene: 650ms;
   --motion-ambient: 750ms;
+  /* 毛玻璃层级：1 最靠后最透（侧栏/标题栏），3 最靠前最实（弹层）。
+     面板只从这三档取值，不各自调 alpha。--theme-* 由封面取色写入 documentElement；
+     壁纸与设置窗口不挂主题 store，靠 var() 第二参数兜底。 */
+  --glass-1: color-mix(
+    in srgb,
+    var(--theme-background, #050809) 72%,
+    transparent
+  );
+  --glass-2: color-mix(
+    in srgb,
+    var(--theme-background, #050809) 84%,
+    transparent
+  );
+  --glass-3: color-mix(
+    in srgb,
+    var(--theme-background, #050809) 93%,
+    transparent
+  );
+  --glass-blur-1: blur(20px) saturate(130%);
+  --glass-blur-2: blur(28px) saturate(140%);
+  --glass-line: var(--theme-line, #dededb26);
   --z-scene: 10;
   --z-controls: 20;
   --z-popover: 30;

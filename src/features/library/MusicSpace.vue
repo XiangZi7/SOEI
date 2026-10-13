@@ -10,14 +10,17 @@ import {
 } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMusicStore } from '../../stores/music'
+import { useThemeStore } from '../../stores/theme'
 import { call, desktop, onNative } from '../../bridge/native'
 import {
   AppIcon,
   UiButton,
   UiIconButton,
-  WindowTitleBar,
 } from '../../components/ui'
-import SpaceHeader from './SpaceHeader.vue'
+import AppShell from '../shell/AppShell.vue'
+import AppSidebar from '../shell/AppSidebar.vue'
+import AppTitleBar from '../shell/AppTitleBar.vue'
+import SidePanel from '../shell/SidePanel.vue'
 import MusicGallery from './MusicGallery.vue'
 import SearchDialog from './SearchDialog.vue'
 import PlayerControls from '../player/PlayerControls.vue'
@@ -31,6 +34,7 @@ import { useWallpaperPlayerWindow } from '../wallpaper/useWallpaperPlayerWindow'
 import type { Track } from '../../types/music'
 import Artwork from '../../components/ui/Artwork.vue'
 const store = useMusicStore()
+const theme = useThemeStore()
 const { activeTrack, previewTrack, preferences, error, notice, scan } =
   storeToRefs(store)
 const backgroundTrack = computed(() => activeTrack.value ?? previewTrack.value)
@@ -61,8 +65,8 @@ const state = reactive({
   controlsHovered: false,
   // 测试曲目正在加载
   testLoading: false,
-  // 聚焦封面的环境颜色
-  ambientColor: 'var(--color-ambient-default)',
+  // 侧栏折叠状态
+  sidebarCollapsed: false,
 })
 const {
   sceneOpen,
@@ -74,9 +78,9 @@ const {
   queueOpen,
   fullscreen,
   controlsVisible,
-  ambientColor,
   controlsHovered,
   testLoading,
+  sidebarCollapsed,
 } = toRefs(state)
 const {
   hidden: wallpaperPlayerHidden,
@@ -163,10 +167,12 @@ function openWallpaper() {
   state.wallpaperOpen = true
   revealControls()
 }
+// 悬停封面时整个界面按那张封面重新取色；结果按曲目缓存，重复悬停不再解码封面。
+// 传入 null 表示离开画廊，回到当前播放/预览曲目的主题。
 function preview(track: Track | null) {
   clearTimeout(ambientTimer)
   ambientTimer = setTimeout(() => {
-    state.ambientColor = track?.color ?? 'var(--color-ambient-default)'
+    void theme.resolve(track ?? backgroundTrack.value)
   }, 80)
 }
 function toggleSearch() {
@@ -260,6 +266,8 @@ watch(notice, () => {
     store.notice = ''
   }, 6000)
 })
+// 换歌即换主题；取色写入 documentElement 的 CSS 变量，全局继承。
+watch(backgroundTrack, track => void theme.resolve(track), { immediate: true })
 watch(
   () => store.wallpaper.enabled.length,
   (enabled, previouslyEnabled) => {
@@ -295,153 +303,14 @@ onBeforeUnmount(() => {
 })
 </script>
 <template>
-  <main
-    class="music-space relative isolate min-h-dvh"
+  <div
+    class="music-space-root"
     :class="{
       'reduced-motion': preferences.reducedMotion,
-      'has-window-strip': desktop && !fullscreen && !wallpaperPlayer,
-      'is-wallpaper-player': wallpaperPlayer,
+      'is-fullscreen': fullscreen,
     }"
-    :style="{ '--ambient-color': ambientColor }"
   >
-    <div
-      v-if="!wallpaperPlayer"
-      class="ambient-background pointer-events-none fixed inset-0 -z-10 overflow-hidden"
-      aria-hidden="true"
-    >
-      <Transition
-        name="ambient-cover"
-        appear
-        ><div
-          v-if="backgroundTrack"
-          :key="backgroundTrack.id"
-          class="library-cover-layer"
-        >
-          <Artwork
-            class="library-cover-background"
-            eager
-            :artwork="backgroundTrack.artwork"
-            :src="backgroundTrack.coverRef"
-            :title="backgroundTrack.title"
-          /></div
-      ></Transition>
-      <span class="library-cover-shade" />
-      <span class="ambient-beam" /><span class="ambient-reflection" />
-    </div>
-    <WindowTitleBar
-      v-if="desktop && !fullscreen && sceneOpen && !wallpaperPlayer"
-      class="fixed top-0 right-0 left-0 z-(--z-window)"
-      @close="call('window_action', { action: 'close' }).catch(store.report)"
-      @error="store.report"
-    />
-    <div
-      v-show="!sceneOpen && !wallpaperPlayer"
-      class="library-view relative isolate z-0"
-    >
-      <SpaceHeader
-        @search="toggleSearch"
-        @settings="settings()"
-        @import="importMusic()"
-        ><template
-          v-if="desktop && !fullscreen"
-          #window
-          ><WindowTitleBar
-            embedded
-            @close="
-              call('window_action', { action: 'close' }).catch(store.report)
-            "
-            @error="store.report" /></template
-      ></SpaceHeader>
-      <MusicGallery
-        :test-loading="testLoading"
-        @select="select"
-        @preview="preview"
-        @import="importMusic"
-        @test="playTest"
-        @scene="openCurrentScene"
-      />
-      <div class="library-note">
-        <div class="library-motto shrink-0 font-display">
-          <p
-            class="text-[13px] leading-[1.8] tracking-[.15em]"
-            lang="ja"
-          >
-            音が、<br />世界をつくる。
-          </p>
-          <p class="mt-2 text-[10px] leading-[1.6] tracking-[.08em] text-muted">
-            Every song.<br />becomes a visual world.
-          </p>
-        </div>
-      </div>
-    </div>
-    <footer
-      v-show="!sceneOpen && !wallpaperPlayer"
-      class="space-colophon mx-auto flex items-end justify-between font-display text-[9px] leading-[1.7] tracking-[.2em] text-muted"
-    >
-      <p>A NEW WAY TO FEEL MUSIC.<br />FOR A MORE BEAUTIFUL TOMORROW.</p>
-      <p
-        lang="ja"
-        class="max-sm:hidden"
-      >
-        音楽で、少しだけ特別に。
-      </p>
-    </footer>
-    <Transition
-      name="scene"
-      :css="!wallpaperPlayer"
-      ><div
-        v-if="sceneOpen && !wallpaperPlayer"
-        class="scene-view fixed inset-0 z-(--z-scene)"
-        @pointermove="revealControls"
-        @touchstart="revealControls"
-      >
-        <ImmersiveScene
-          :preview="scenePreview"
-          @queue="queueOpen = !queueOpen"
-          @fullscreen="toggleFullscreen"
-          @close="sceneOpen = false"
-        />
-        <div
-          class="scene-controls absolute top-9 right-[5%] left-[5%] flex items-center justify-between gap-3 max-sm:top-5 max-sm:right-[4%] max-sm:left-[4%]"
-          :class="{ 'controls-hidden': !controlsVisible }"
-          @pointerenter="controlsHovered = true"
-          @pointerleave="leaveControls"
-          @focusin="revealControls"
-        >
-          <UiButton
-            variant="ghost"
-            class="min-h-11 gap-2 rounded-full border border-line bg-stage/60 px-4 text-label backdrop-blur-xl max-sm:px-3"
-            @click="sceneOpen = false"
-            ><AppIcon
-              name="arrow-left"
-              :size="15"
-            /><span class="max-sm:hidden">音乐空间</span
-            ><span class="hidden max-sm:inline">返回</span></UiButton
-          >
-          <SceneModePicker
-            v-model="preferences.layout"
-            v-model:seed="preferences.sceneSeed"
-            compact
-          />
-          <div class="flex items-center gap-2">
-            <UiIconButton
-              icon="monitor"
-              label="桌面壁纸"
-              class="size-11 rounded-full border border-line bg-stage/60 backdrop-blur-xl"
-              :active="!!store.wallpaper.enabled.length"
-              :icon-size="17"
-              @click="openWallpaper"
-            />
-            <UiIconButton
-              icon="settings-2"
-              label="场景设置"
-              class="size-11 rounded-full border border-line bg-stage/60 backdrop-blur-xl"
-              @click="settings('visual')"
-              :icon-size="17"
-            />
-          </div>
-        </div></div
-    ></Transition>
+    <!-- 壁纸小窗是独立的 560×310 窗口形态，不套应用外壳。 -->
     <WallpaperPlayer
       v-if="wallpaperPlayer"
       :hidden="wallpaperPlayerHidden"
@@ -453,25 +322,165 @@ onBeforeUnmount(() => {
       @settings="settings('visual')"
       @restore="store.setWallpaper([])"
     />
-    <div
-      v-if="!wallpaperPlayer"
-      class="player-dock scene-controls fixed right-[5%] bottom-9 left-[5%] z-(--z-controls) mx-auto max-w-260 max-sm:right-[4%] max-sm:bottom-5 max-sm:left-[4%]"
-      @pointerenter="controlsHovered = true"
-      @pointerleave="leaveControls"
-      @focusin="revealControls"
-    >
-      <PlayerControls
-        :preview="sceneOpen ? scenePreview : !activeTrack"
-        @queue="queueOpen = !queueOpen"
-        @fullscreen="toggleFullscreen"
-        @scene="sceneOpen ? settings('lyrics') : openCurrentScene(!activeTrack)"
-      />
-    </div>
+    <AppShell v-else>
+      <template #background>
+        <Transition
+          name="ambient-cover"
+          appear
+          ><div
+            v-if="backgroundTrack"
+            :key="backgroundTrack.id"
+            class="library-cover-layer"
+          >
+            <Artwork
+              class="library-cover-background"
+              eager
+              :artwork="backgroundTrack.artwork"
+              :src="backgroundTrack.coverRef"
+              :title="backgroundTrack.title"
+            /></div
+        ></Transition>
+        <span class="library-cover-shade" />
+        <span class="ambient-beam" /><span class="ambient-reflection" />
+      </template>
+
+      <template #titlebar>
+        <AppTitleBar
+          v-if="!fullscreen"
+          :theme-name="theme.theme.name"
+          @search="toggleSearch"
+          @settings="settings()"
+          @error="store.report"
+        />
+      </template>
+
+      <template #sidebar>
+        <AppSidebar
+          v-model:collapsed="sidebarCollapsed"
+          @import="importMusic()"
+          @scene="openCurrentScene(!activeTrack)"
+        />
+      </template>
+
+      <div class="library-view">
+        <MusicGallery
+          :test-loading="testLoading"
+          @select="select"
+          @preview="preview"
+          @import="importMusic"
+          @test="playTest"
+          @scene="openCurrentScene"
+        />
+        <div class="library-note">
+          <div class="library-motto shrink-0 font-display">
+            <p
+              class="text-[13px] leading-[1.8] tracking-[.15em]"
+              lang="ja"
+            >
+              音が、<br />世界をつくる。
+            </p>
+            <p
+              class="mt-2 text-[10px] leading-[1.6] tracking-[.08em] text-muted"
+            >
+              Every song.<br />becomes a visual world.
+            </p>
+          </div>
+        </div>
+        <footer
+          class="space-colophon flex items-end justify-between font-display text-[9px] leading-[1.7] tracking-[.2em] text-muted"
+        >
+          <p>A NEW WAY TO FEEL MUSIC.<br />FOR A MORE BEAUTIFUL TOMORROW.</p>
+          <p
+            lang="ja"
+            class="max-sm:hidden"
+          >
+            音楽で、少しだけ特別に。
+          </p>
+        </footer>
+      </div>
+
+      <template #panel>
+        <SidePanel
+          :open="queueOpen"
+          @close="queueOpen = false"
+        />
+      </template>
+
+      <template #stage>
+        <Transition name="scene"
+          ><div
+            v-if="sceneOpen"
+            class="scene-view"
+            @pointermove="revealControls"
+            @touchstart="revealControls"
+          >
+            <ImmersiveScene
+              :preview="scenePreview"
+              @queue="queueOpen = !queueOpen"
+              @fullscreen="toggleFullscreen"
+              @close="sceneOpen = false"
+            />
+            <div
+              class="scene-controls absolute top-5 right-[4%] left-[4%] flex items-center justify-between gap-3"
+              :class="{ 'controls-hidden': !controlsVisible }"
+              @pointerenter="controlsHovered = true"
+              @pointerleave="leaveControls"
+              @focusin="revealControls"
+            >
+              <UiButton
+                variant="ghost"
+                class="min-h-11 gap-2 rounded-full border border-line bg-stage/60 px-4 text-label backdrop-blur-xl max-sm:px-3"
+                @click="sceneOpen = false"
+                ><AppIcon
+                  name="arrow-left"
+                  :size="15"
+                /><span class="max-sm:hidden">音乐空间</span
+                ><span class="hidden max-sm:inline">返回</span></UiButton
+              >
+              <SceneModePicker
+                v-model="preferences.layout"
+                v-model:seed="preferences.sceneSeed"
+                compact
+              />
+              <div class="flex items-center gap-2">
+                <UiIconButton
+                  icon="monitor"
+                  label="桌面壁纸"
+                  class="size-11 rounded-full border border-line bg-stage/60 backdrop-blur-xl"
+                  :active="!!store.wallpaper.enabled.length"
+                  :icon-size="17"
+                  @click="openWallpaper"
+                />
+                <UiIconButton
+                  icon="settings-2"
+                  label="场景设置"
+                  class="size-11 rounded-full border border-line bg-stage/60 backdrop-blur-xl"
+                  :icon-size="17"
+                  @click="settings('visual')"
+                />
+              </div>
+            </div></div
+        ></Transition>
+      </template>
+
+      <template #player>
+        <PlayerControls
+          variant="bar"
+          :preview="sceneOpen ? scenePreview : !activeTrack"
+          @queue="queueOpen = !queueOpen"
+          @fullscreen="toggleFullscreen"
+          @scene="
+            sceneOpen ? settings('lyrics') : openCurrentScene(!activeTrack)
+          "
+        />
+      </template>
+    </AppShell>
+
+    <!-- 两种窗口形态共用的弹层。壁纸小窗没有停靠栏，队列仍走悬浮面板。 -->
     <Transition name="fade"
       ><div
-        v-if="queueOpen"
-        class="fixed right-[5%] bottom-36 z-(--z-popover) max-sm:right-[3%] max-sm:bottom-25"
-        :class="{ 'compact-queue': wallpaperPlayer }"
+        v-if="queueOpen && wallpaperPlayer"
+        class="compact-queue fixed right-[3%] bottom-25 z-(--z-popover)"
       >
         <QueuePanel @close="queueOpen = false" /></div
     ></Transition>
@@ -493,7 +502,7 @@ onBeforeUnmount(() => {
     />
     <div
       v-if="scan.running"
-      class="scan-toast glass-panel fixed bottom-28 left-[5%] z-(--z-notification) flex max-w-[min(500px,90vw)] items-center gap-3 rounded-input py-1.5 pr-2.5 pl-4 text-[11px]"
+      class="scan-toast glass-panel fixed bottom-28 left-6 z-(--z-notification) flex max-w-[min(500px,90vw)] items-center gap-3 rounded-input py-1.5 pr-2.5 pl-4 text-[11px]"
       role="status"
     >
       <AppIcon
@@ -503,14 +512,14 @@ onBeforeUnmount(() => {
       ><UiIconButton
         icon="x"
         label="取消扫描"
-        @click="call('library_cancel').catch(store.report)"
         :icon-size="14"
+        @click="call('library_cancel').catch(store.report)"
       />
     </div>
     <Transition name="fade"
       ><div
         v-if="error || notice"
-        class="notification glass-panel fixed top-25 left-1/2 z-(--z-notification) flex max-w-[min(500px,90vw)] -translate-x-1/2 items-center gap-3 rounded-input py-1.5 pr-2.5 pl-4 text-[11px] max-sm:top-19"
+        class="notification glass-panel fixed top-14 left-1/2 z-(--z-notification) flex max-w-[min(500px,90vw)] -translate-x-1/2 items-center gap-3 rounded-input py-1.5 pr-2.5 pl-4 text-[11px]"
         :class="{ 'is-error': error }"
         :role="error ? 'alert' : 'status'"
       >
@@ -521,8 +530,8 @@ onBeforeUnmount(() => {
         ><UiIconButton
           icon="x"
           label="关闭提示"
-          @click="dismissNotification"
           :icon-size="14"
+          @click="dismissNotification"
         /></div
     ></Transition>
     <input
@@ -542,7 +551,7 @@ onBeforeUnmount(() => {
       accept=".lrc,.vtt,.ttml,.yrc,.qrc,.krc,.awlrc"
       @change="lyricsSelected"
     />
-  </main>
+  </div>
 </template>
 <style scoped>
 .music-space {

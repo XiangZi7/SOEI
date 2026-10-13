@@ -6,6 +6,10 @@ import Artwork from '../../components/ui/Artwork.vue'
 import { formatTime } from '../lyrics/lrc'
 const store = useMusicStore()
 const { queueTracks, snapshot, preferences } = storeToRefs(store)
+// docked：停靠在外壳右侧栏时撑满高度、去掉卡片外观；默认是悬浮弹层。
+const props = withDefaults(defineProps<{ docked?: boolean }>(), {
+  docked: false,
+})
 defineEmits<{ close: [] }>()
 function remove(id: string) {
   void store.setQueue(store.snapshot.queue.filter(item => item !== id))
@@ -29,7 +33,11 @@ function addToPlaylist(trackId: string, event: Event) {
 
 <template>
   <UiPanel
-    class="w-[min(440px,calc(100vw-2.5rem))] p-6"
+    :class="
+      props.docked
+        ? 'flex h-full w-full flex-col rounded-none border-0 bg-transparent p-5 shadow-none backdrop-blur-none'
+        : 'w-[min(440px,calc(100vw-2.5rem))] p-6'
+    "
     role="complementary"
     aria-label="播放队列"
   >
@@ -49,7 +57,7 @@ function addToPlaylist(trackId: string, event: Event) {
         @click="$emit('close')"
       />
     </div>
-    <div class="max-h-[50vh] overflow-y-auto">
+    <div :class="props.docked ? 'min-h-0 flex-1 overflow-y-auto' : 'max-h-[50vh] overflow-y-auto'">
       <div
         v-for="(track, index) in queueTracks"
         :key="track.id + '-' + index"
