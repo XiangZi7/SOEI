@@ -1,4 +1,4 @@
-import type { LyricLine, SceneLayout } from '../../types/music'
+import type { LegacySceneLayout, LyricLine } from '../../types/music'
 import { buildGlyphTimings } from '../lyrics/glyphTiming'
 import { getLineTransitionTiming } from '../lyrics/folia/renderHints'
 
@@ -16,7 +16,8 @@ export interface LyricMotionPlan {
   pulsing: boolean[]
 }
 
-const recipes: Record<SceneLayout, readonly LyricMotionRecipe[]> = {
+// 只有原有的 CSS 场景走这套动效配方；移植自 Folia 的 visualizer 模式自带动效。
+const recipes: Record<LegacySceneLayout, readonly LyricMotionRecipe[]> = {
   manuscript: ['soft', 'wipe'],
   artistic: ['soft', 'focus', 'lift'],
   collage: ['lift', 'focus', 'soft'],
@@ -39,7 +40,7 @@ export function planLyricMotion({
   line: LyricLine
   endMs: number
   glyphs: readonly string[]
-  layout: SceneLayout
+  layout: LegacySceneLayout
   variant: number
 }): LyricMotionPlan {
   const durationMs = Math.max(1, endMs - line.startMs)

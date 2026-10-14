@@ -4,7 +4,7 @@ import {
   useElementVisibility,
   useResizeObserver,
 } from '@vueuse/core'
-import type { Preferences, SceneLayout } from '../../types/music'
+import type { Preferences, LegacySceneLayout } from '../../types/music'
 
 interface StageOptions {
   color: string
@@ -12,7 +12,7 @@ interface StageOptions {
   reducedMotion: boolean
   quality: Preferences['quality']
   energy: number
-  layout: SceneLayout
+  layout: LegacySceneLayout
   variant: number
 }
 

@@ -1,5 +1,5 @@
 import { onScopeDispose, watch } from 'vue'
-import type { LyricLine, SceneLayout } from '../../types/music'
+import type { LyricLine, LegacySceneLayout } from '../../types/music'
 import {
   lyricCameraFrame,
   lyricGlyphFrame,
@@ -14,7 +14,7 @@ interface MotionOptions {
   positionMs: number
   endMs: number
   line: LyricLine
-  layout: SceneLayout
+  layout: LegacySceneLayout
   variant: number
   trackId: string
 }

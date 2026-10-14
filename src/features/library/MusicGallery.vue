@@ -192,9 +192,12 @@ watch(tab, () => {
         :class="{ 'featured-grid': featured }"
       >
         <CoverCard
-          v-for="track in tab === 'all' ? filteredTracks : groupTracks"
+          v-for="(track, trackIndex) in tab === 'all'
+            ? filteredTracks
+            : groupTracks"
           :key="track.id"
           :track="track"
+          :index="trackIndex"
           :featured="featured && track.id === previewId"
           :show-title="preferences.showTitles"
           :playing="
@@ -279,6 +282,11 @@ watch(tab, () => {
   </section>
 </template>
 <style scoped>
+/* 侧栏占掉宽度后，视口宽度不再等于内容宽度，所以封面墙按容器宽度断点，
+   而不是视口媒体查询 —— 否则折叠/展开侧栏时列数不会跟着变。 */
+.music-gallery {
+  container-type: inline-size;
+}
 .cover-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -289,18 +297,25 @@ watch(tab, () => {
   text-decoration: underline;
   text-underline-offset: 6px;
 }
-@media (max-width: 1100px) {
+@container (max-width: 1100px) {
   .cover-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 20px 16px;
   }
 }
-@media (max-width: 850px) {
+@container (max-width: 880px) {
   .cover-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 20px;
   }
 }
-@media (max-width: 500px) {
+@container (max-width: 660px) {
+  .cover-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+}
+@container (max-width: 440px) {
   .cover-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;

@@ -11,6 +11,19 @@ use std::{
 };
 use tauri::{AppHandle, Emitter, Manager};
 
+/// 频段划分，对齐 Folia 的 `AudioBands`（folia src/types.ts）：
+/// bass 20-150 / lowMid 150-400 / mid 400-1200 / vocal 1000-3500 / treble 3500+。
+/// mid 与 vocal 刻意重叠，所以这些区间不是一个划分（partition）。
+const ENERGY_BANDS: [(f32, f32); 5] = [
+    (20.0, 150.0),
+    (150.0, 400.0),
+    (400.0, 1200.0),
+    (1000.0, 3500.0),
+    (3500.0, f32::INFINITY),
+];
+/// energy 数组：槽 0 是总能量，其余依次对应 ENERGY_BANDS。
+pub const ENERGY_SLOTS: usize = ENERGY_BANDS.len() + 1;
+
 pub enum Operation {
     Play(Track),
     Toggle,
@@ -65,7 +78,9 @@ fn run(
     let mut snapshot = PlaybackSnapshot::default();
     let mut queue: Vec<Track> = vec![];
     let mut history: Vec<Track> = vec![];
-    let energy = Arc::new(std::array::from_fn::<_, 4, _>(|_| AtomicU32::new(0)));
+    let energy = Arc::new(std::array::from_fn::<_, ENERGY_SLOTS, _>(|_| {
+        AtomicU32::new(0)
+    }));
     loop {
         match receiver.recv_timeout(Duration::from_millis(125)) {
             Ok((operation, reply)) => {
@@ -143,7 +158,7 @@ fn run(
                                 }
                                 snapshot.status = "stopped".into();
                                 snapshot.position_ms = 0;
-                                snapshot.energy = [0.0; 4];
+                                snapshot.energy = [0.0; ENERGY_SLOTS];
                             }
                         }
                         Operation::Next => {
@@ -227,7 +242,7 @@ fn run(
                             }
                         } else {
                             snapshot.status = "stopped".into();
-                            snapshot.energy = [0.0; 4];
+                            snapshot.energy = [0.0; ENERGY_SLOTS];
                         }
                     }
                     publish(&app, &projection, &mut snapshot);
@@ -275,7 +290,7 @@ fn play(
     sink: &mut Option<Sink>,
     state: &mut PlaybackSnapshot,
     history: &mut Vec<Track>,
-    energy: Arc<[AtomicU32; 4]>,
+    energy: Arc<[AtomicU32; ENERGY_SLOTS]>,
 ) -> AppResult<()> {
     // 解码和输出流准备成功后才停旧歌，损坏的新文件不能破坏已有播放。
     let decoder = Decoder::try_from(File::open(&track.local_path)?)
@@ -315,7 +330,7 @@ fn play(
     state.position_ms = 0;
     state.duration_ms = duration;
     state.status = "playing".into();
-    state.energy = [0.0; 4];
+    state.energy = [0.0; ENERGY_SLOTS];
     if let Ok(updated) = record_playback(&app.state::<crate::AppState>().storage, track) {
         let _ = app.emit_to("main", "library:track", updated);
     }
@@ -340,7 +355,7 @@ fn publish(app: &AppHandle, projection: &Mutex<PlaybackSnapshot>, snapshot: &mut
 
 struct AnalyzedSource<S> {
     inner: S,
-    energy: Arc<[AtomicU32; 4]>,
+    energy: Arc<[AtomicU32; ENERGY_SLOTS]>,
     fft: Arc<dyn Fft<f32>>,
     buffer: Vec<Complex<f32>>,
     scratch: Vec<Complex<f32>>,
@@ -349,7 +364,7 @@ struct AnalyzedSource<S> {
     mono: f32,
 }
 impl<S: Source<Item = f32>> AnalyzedSource<S> {
-    fn new(inner: S, energy: Arc<[AtomicU32; 4]>) -> Self {
+    fn new(inner: S, energy: Arc<[AtomicU32; ENERGY_SLOTS]>) -> Self {
         let fft = FftPlanner::new().plan_fft_forward(2048);
         let scratch = vec![Complex::default(); fft.get_inplace_scratch_len()];
         Self {
@@ -389,24 +404,25 @@ impl<S: Source<Item = f32>> Iterator for AnalyzedSource<S> {
                 }
                 self.fft
                     .process_with_scratch(&mut self.buffer, &mut self.scratch);
-                let mut bands = [0.0_f32; 3];
+                // 逐段判定而不是 if/else 链式分桶：mid 与 vocal 刻意重叠，
+                // 同一个频点可能同时计入两段。
+                let mut sums = [0.0_f32; ENERGY_BANDS.len()];
                 for (index, value) in self.buffer.iter().take(1024).enumerate().skip(1) {
                     let frequency = index as f32 * self.inner.sample_rate() as f32 / 2048.0;
-                    let band = if frequency < 250.0 {
-                        0
-                    } else if frequency < 4000.0 {
-                        1
-                    } else {
-                        2
-                    };
-                    bands[band] += value.norm_sqr();
+                    let power = value.norm_sqr();
+                    for (band, (low, high)) in ENERGY_BANDS.iter().enumerate() {
+                        if frequency >= *low && frequency < *high {
+                            sums[band] += power;
+                        }
+                    }
                 }
-                let values = [
-                    rms * 3.0,
-                    bands[0].sqrt() / 400.0,
-                    bands[1].sqrt() / 400.0,
-                    bands[2].sqrt() / 400.0,
-                ];
+                // 沿用原有的 sqrt(总功率)/400 标定（已在实机调过），只是频段变细了，
+                // 窄频段读数相应偏低。前端只消费相对变化，并且下面还有 EMA 平滑。
+                let mut values = [0.0_f32; ENERGY_SLOTS];
+                values[0] = rms * 3.0;
+                for (band, sum) in sums.iter().enumerate() {
+                    values[band + 1] = sum.sqrt() / 400.0;
+                }
                 for (target, value) in self.energy.iter().zip(values) {
                     let previous = f32::from_bits(target.load(Ordering::Relaxed));
                     target.store(
@@ -522,6 +538,118 @@ mod tests {
         );
         assert!(next(&[], &state, false).is_none());
     }
+    /// 固定频率的单声道正弦源，用来精确验证频段划分。
+    struct Tone {
+        frequency: f32,
+        sample_rate: u32,
+        index: u64,
+    }
+    impl Iterator for Tone {
+        type Item = f32;
+        fn next(&mut self) -> Option<f32> {
+            let t = self.index as f32 / self.sample_rate as f32;
+            self.index += 1;
+            Some((std::f32::consts::TAU * self.frequency * t).sin())
+        }
+    }
+    impl Source for Tone {
+        fn current_span_len(&self) -> Option<usize> {
+            None
+        }
+        fn channels(&self) -> u16 {
+            1
+        }
+        fn sample_rate(&self) -> u32 {
+            self.sample_rate
+        }
+        fn total_duration(&self) -> Option<Duration> {
+            None
+        }
+    }
+
+    /// 把一个纯音跑满若干个 2048 点的分析窗，返回稳定后的 energy 槽。
+    fn analyze_tone(frequency: f32) -> [f32; ENERGY_SLOTS] {
+        let energy = Arc::new(std::array::from_fn(|_| AtomicU32::new(0)));
+        let mut source = AnalyzedSource::new(
+            Tone {
+                frequency,
+                sample_rate: 44_100,
+                index: 0,
+            },
+            energy.clone(),
+        );
+        // EMA 平滑系数是 0.35，跑 40 个窗足以收敛。
+        for _ in 0..2048 * 40 {
+            source.next();
+        }
+        std::array::from_fn(|index| f32::from_bits(energy[index].load(Ordering::Relaxed)))
+    }
+
+    #[test]
+    fn energy_bands_place_tones_in_the_expected_slots() {
+        // 槽位：0 总能量，1 bass，2 lowMid，3 mid，4 vocal，5 treble。
+        // 断言的是「主导性」而不是「零泄漏」：Hann 窗的旁瓣必然让纯音漏一点能量到相邻频段，
+        // 任何加窗 FFT 都如此，所以要求相邻段为 0 在物理上是错的。
+        let dominant = |slots: &[f32; ENERGY_SLOTS]| {
+            let bands = &slots[1..];
+            let mut best = 0;
+            for (index, value) in bands.iter().enumerate() {
+                if *value > bands[best] {
+                    best = index;
+                }
+            }
+            // 返回频段下标（0 = bass），以及它相对次大值的倍数。
+            let mut second = f32::MIN;
+            for (index, value) in bands.iter().enumerate() {
+                if index != best && *value > second {
+                    second = *value;
+                }
+            }
+            (best, bands[best] / second.max(f32::EPSILON))
+        };
+
+        let (band, margin) = dominant(&analyze_tone(80.0));
+        assert_eq!(band, 0, "80Hz 应由 bass 主导");
+        assert!(margin > 3.0, "bass 应明显压过相邻段的泄漏，实际 {margin}x");
+
+        let (band, margin) = dominant(&analyze_tone(250.0));
+        assert_eq!(band, 1, "250Hz 应由 lowMid 主导");
+        assert!(margin > 3.0, "lowMid 应明显压过泄漏，实际 {margin}x");
+
+        let (band, margin) = dominant(&analyze_tone(8000.0));
+        assert_eq!(band, 4, "8kHz 应由 treble 主导");
+        assert!(margin > 3.0, "treble 应明显压过泄漏，实际 {margin}x");
+
+        // mid(400-1200) 与 vocal(1000-3500) 刻意重叠：1100Hz 必须同时实打实计入两段，
+        // 这两段应当是最强的两段，而不是靠泄漏蹭到的量级。
+        let overlap = analyze_tone(1100.0);
+        let bands = &overlap[1..];
+        assert!(
+            bands[2] > 0.0 && bands[3] > 0.0,
+            "1100Hz 应同时落在 mid 与 vocal"
+        );
+        let weakest_overlap = bands[2].min(bands[3]);
+        for (index, value) in bands.iter().enumerate() {
+            if index == 2 || index == 3 {
+                continue;
+            }
+            assert!(
+                weakest_overlap > *value * 3.0,
+                "重叠的两段应明显强于其余频段，第 {index} 段为 {value}"
+            );
+        }
+
+        // 所有槽位都必须是 0..1 的有限值。
+        for frequency in [80.0, 250.0, 1100.0, 8000.0] {
+            for value in analyze_tone(frequency) {
+                assert!(
+                    value.is_finite() && (0.0..=1.0).contains(&value),
+                    "energy 槽位必须限幅在 0..1，实际 {value}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn wav_decode_seek_and_pcm_analysis() {
         let path =

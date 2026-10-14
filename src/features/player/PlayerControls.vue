@@ -189,6 +189,16 @@ function volume(event: Event) {
   width: 54px;
   height: 54px;
   border-radius: var(--radius-input);
+  /* 悬停时沿 Y 轴轻微转出立体感，并补一层封面色的投影。 */
+  transition:
+    transform var(--motion-scene) var(--ease-scene),
+    box-shadow var(--motion-scene) var(--ease-scene);
+}
+.player-bar.is-bar .player-song:hover .player-artwork {
+  transform: perspective(520px) rotateY(-11deg) rotateX(4deg) scale(1.04);
+  box-shadow:
+    -6px 8px 20px #00000066,
+    0 0 0 1px var(--theme-glow-soft, transparent);
 }
 .player-bar.is-bar .player-title {
   font-size: 16px;

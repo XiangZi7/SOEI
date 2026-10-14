@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { SceneLayout } from '../../types/music'
-import { sceneModes } from './sceneModes'
+import { sceneModeChoices } from './sceneModes'
 import { AppIcon } from '../../components/ui'
 import { nextTick, useTemplateRef, watch } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
@@ -38,7 +38,7 @@ useResizeObserver(choices, revealSelected)
       :class="compact ? 'max-w-[58vw] sm:max-w-[65vw]' : 'max-w-[78vw]'"
     >
       <button
-        v-for="mode in sceneModes"
+        v-for="mode in sceneModeChoices()"
         :key="mode.id"
         ref="buttons"
         :data-mode="mode.id"

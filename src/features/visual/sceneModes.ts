@@ -1,8 +1,21 @@
-import type { LyricLine, SceneLayout } from '../../types/music'
+import type {
+  LegacySceneLayout,
+  LyricLine,
+  SceneLayout,
+} from '../../types/music'
 import { lyricGlyphs } from './lyricText'
+import { visualizerEntries } from '../visualizer/registry'
 
-export const sceneModes: {
+export interface SceneModeChoice {
   id: SceneLayout
+  name: string
+  description: string
+  number: string
+}
+
+/** SOEI 原有的七个纯 CSS/DOM 场景。 */
+export const legacySceneModes: {
+  id: LegacySceneLayout
   name: string
   description: string
   number: string
@@ -50,6 +63,34 @@ export const sceneModes: {
     number: '07',
   },
 ]
+
+/**
+ * 选择器展示的全部场景：原有 CSS 场景在前，从 Folia 移植的 visualizer 模式接在后面。
+ * 编号连续，所以新增模式不需要手工维护序号。
+ */
+export function sceneModeChoices(): SceneModeChoice[] {
+  const ported = visualizerEntries().map((entry, index) => ({
+    id: entry.mode as SceneLayout,
+    name: entry.label,
+    description: entry.description,
+    number: String(legacySceneModes.length + index + 1).padStart(2, '0'),
+  }))
+  return [...legacySceneModes, ...ported]
+}
+
+const LEGACY_IDS: ReadonlySet<string> = new Set(
+  legacySceneModes.map(mode => mode.id)
+)
+
+/**
+ * 运行时判定是否为原有的 CSS 场景。旧场景引擎的模块只接受 LegacySceneLayout，
+ * 而偏好里存的是全集，所以需要真实检查而不是类型断言。
+ */
+export function isLegacySceneLayout(
+  layout: SceneLayout
+): layout is LegacySceneLayout {
+  return LEGACY_IDS.has(layout)
+}
 
 // 原创分镜预览，与音频播放进度相互独立。
 export const previewLyrics: LyricLine[] = [

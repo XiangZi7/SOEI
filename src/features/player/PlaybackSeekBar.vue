@@ -274,7 +274,12 @@ function keyDown(event: KeyboardEvent) {
 }
 .seek-progress {
   height: 100%;
-  background: #e6e6d9;
+  /* 已播放段跟随封面取色，并带一层贴着轨道的光晕。 */
+  background: var(--theme-accent, #e6e6d9);
+  box-shadow: 0 0 6px var(--theme-glow, transparent);
+  transition:
+    background var(--motion-ambient),
+    box-shadow var(--motion-ambient);
 }
 .seek-input {
   position: relative;
@@ -297,7 +302,7 @@ function keyDown(event: KeyboardEvent) {
   appearance: none;
   border: 0;
   border-radius: 50%;
-  background: #efeee3;
+  background: var(--theme-accent, #efeee3);
   opacity: 0;
 }
 .seek-input::-moz-range-track {
@@ -309,7 +314,7 @@ function keyDown(event: KeyboardEvent) {
   height: 4px;
   border: 0;
   border-radius: 50%;
-  background: #efeee3;
+  background: var(--theme-accent, #efeee3);
   opacity: 0;
 }
 .seek-input:is(:hover, :focus-visible):not(:disabled)::-webkit-slider-thumb {

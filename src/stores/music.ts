@@ -38,6 +38,7 @@ export const defaultPreferences: Preferences = {
   queue: [],
   trackOffsets: {},
   trackBackgrounds: {},
+  visualizerTunings: {},
 }
 const emptySnapshot = (): PlaybackSnapshot => ({
   sessionId: 0,
@@ -49,7 +50,7 @@ const emptySnapshot = (): PlaybackSnapshot => ({
   volume: 0.65,
   repeatMode: 'sequential',
   queue: [],
-  energy: [0, 0, 0, 0],
+  energy: [0, 0, 0, 0, 0, 0],
   error: null,
 })
 

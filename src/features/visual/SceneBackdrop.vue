@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { useTemplateRef } from 'vue'
-import type { ArtworkCrop, Preferences, SceneLayout } from '../../types/music'
+import type {
+  ArtworkCrop,
+  Preferences,
+  LegacySceneLayout,
+} from '../../types/music'
 import Artwork from '../../components/ui/Artwork.vue'
 import { assetUrl } from '../../bridge/native'
 import { useStageRenderer } from './useStageRenderer'
@@ -13,7 +17,7 @@ const props = defineProps<{
   background: string
   video: boolean
   color: string
-  layout: SceneLayout
+  layout: LegacySceneLayout
   variant: number
   animated: boolean
   reducedMotion: boolean

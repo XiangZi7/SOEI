@@ -27,7 +27,8 @@ pub struct PlaybackSnapshot {
     pub volume: f32,
     pub repeat_mode: String,
     pub queue: Vec<String>,
-    pub energy: [f32; 4],
+    /// [总能量, bass, lowMid, mid, vocal, treble]，见 audio::ENERGY_SLOTS。
+    pub energy: [f32; 6],
     pub error: Option<String>,
 }
 
@@ -43,7 +44,7 @@ impl Default for PlaybackSnapshot {
             volume: 0.65,
             repeat_mode: "sequential".into(),
             queue: vec![],
-            energy: [0.0; 4],
+            energy: [0.0; 6],
             error: None,
         }
     }

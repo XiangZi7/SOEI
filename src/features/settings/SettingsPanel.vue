@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, toRefs, watch } from 'vue'
+import { computed, defineAsyncComponent, reactive, toRefs, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMusicStore } from '../../stores/music'
 import { call, desktop } from '../../bridge/native'
@@ -13,8 +13,11 @@ import {
   UiSlider,
 } from '../../components/ui'
 import SettingRow from './SettingRow.vue'
-import { sceneModes } from '../visual/sceneModes'
+import { sceneModeChoices } from '../visual/sceneModes'
 import { settingsCategory } from './categories'
+const ClassicSettingsPanel = defineAsyncComponent(
+  () => import('../visualizer/classic/ClassicSettingsPanel.vue')
+)
 const props = defineProps<{ initialCategory?: string; windowed?: boolean }>()
 const emit = defineEmits<{ close: []; lyrics: [] }>()
 const store = useMusicStore()
@@ -191,7 +194,7 @@ async function applyShortcuts(clear = false) {
               class="text-[11px]"
               label="歌词排版"
               ><option
-                v-for="mode in sceneModes"
+                v-for="mode in sceneModeChoices()"
                 :key="mode.id"
                 :value="mode.id"
               >
@@ -268,6 +271,16 @@ async function applyShortcuts(clear = false) {
               v-model="preferences.reducedMotion"
               label="减少动态效果"
           /></SettingRow>
+          <ClassicSettingsPanel
+            v-if="preferences.layout === 'classic'"
+            :tuning="preferences.visualizerTunings?.classic"
+            @update:tuning="
+              preferences.visualizerTunings = {
+                ...preferences.visualizerTunings,
+                classic: $event,
+              }
+            "
+          />
         </template>
         <template v-else-if="category === 'performance'">
           <SettingRow

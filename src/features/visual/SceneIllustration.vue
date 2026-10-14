@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { SceneLayout } from '../../types/music'
+import type { LegacySceneLayout } from '../../types/music'
 import { reactive, watch } from 'vue'
 const props = defineProps<{
-  layout: SceneLayout
+  layout: LegacySceneLayout
   variant: number
   animated: boolean
 }>()

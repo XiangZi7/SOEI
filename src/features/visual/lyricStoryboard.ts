@@ -1,11 +1,13 @@
-import type { LyricLine, SceneLayout } from '../../types/music'
+import type { LyricLine, LegacySceneLayout } from '../../types/music'
 import { lyricFragments } from './sceneModes'
 import { lyricGlyphs } from './lyricText'
 import { buildSemanticFragments, richLyricGlyphs } from '../lyrics/layout'
 
-export type KineticLayout = Exclude<SceneLayout, 'readable' | 'title'>
+export type KineticLayout = Exclude<LegacySceneLayout, 'readable' | 'title'>
 
-export function isKineticLayout(layout: SceneLayout): layout is KineticLayout {
+export function isKineticLayout(
+  layout: LegacySceneLayout
+): layout is KineticLayout {
   return layout !== 'readable' && layout !== 'title'
 }
 
@@ -25,7 +27,7 @@ const palettes = [
   { accent: '#e6b9bb', muted: '#b4acc9', glow: '#9b7cae' },
   { accent: '#aed5c8', muted: '#a4bac5', glow: '#699caa' },
 ]
-export function shotPalette(layout: SceneLayout, variant: number) {
+export function shotPalette(layout: LegacySceneLayout, variant: number) {
   return palettes[
     layout === 'montage' || layout === 'collage' ? variant % 3 : 0
   ]!

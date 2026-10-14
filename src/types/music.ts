@@ -32,6 +32,10 @@ export interface PlaybackSnapshot {
   volume: number
   repeatMode: string
   queue: string[]
+  /**
+   * [总能量, bass, lowMid, mid, vocal, treble]，与 src-tauri/src/audio.rs 的 ENERGY_SLOTS 对应。
+   * 频段划分对齐 Folia 的 AudioBands；mid(400-1200) 与 vocal(1000-3500) 刻意重叠。
+   */
   energy: number[]
   error: string | null
 }
@@ -113,7 +117,8 @@ export interface LyricDocument {
 /** Native IPC transports bytes so encrypted KRC and legacy encodings survive intact. */
 export type LyricFileSource = string | { name: string; bytes: number[] }
 export type LibraryTab = 'all' | 'albums' | 'artists' | 'playlists'
-export type SceneLayout =
+/** SOEI 原有的纯 CSS/DOM 场景。 */
+export type LegacySceneLayout =
   | 'manuscript'
   | 'artistic'
   | 'collage'
@@ -121,6 +126,13 @@ export type SceneLayout =
   | 'montage'
   | 'readable'
   | 'title'
+/**
+ * 从 Folia 移植的 visualizer 模式 id，与 features/visualizer/<mode>/entry.ts 一一对应。
+ * 模式落地时才加进这个联合 —— 类型不应声称存在还没实现的模式。
+ * 目标集合（14 个）见 docs/LYRICS_ENGINE.md 的移植计划。
+ */
+export type VisualizerLayout = 'still' | 'classic'
+export type SceneLayout = LegacySceneLayout | VisualizerLayout
 export interface Playlist {
   id: string
   name: string
@@ -141,6 +153,7 @@ export interface Preferences {
   queue: string[]
   trackOffsets: Record<string, number>
   trackBackgrounds: Record<string, string>
+  visualizerTunings?: Record<string, unknown>
 }
 export interface Display {
   id: string

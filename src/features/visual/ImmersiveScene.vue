@@ -8,11 +8,21 @@ import {
   usePreferredReducedMotion,
 } from '@vueuse/core'
 import { useMusicStore } from '../../stores/music'
+import { useThemeStore } from '../../stores/theme'
+import type { LegacySceneLayout } from '../../types/music'
 import { lyricIndexAt } from '../lyrics/lrc'
 import { useLyricClock } from '../lyrics/useLyricClock'
 import SceneBackdrop from './SceneBackdrop.vue'
 import LyricStage from './LyricStage.vue'
-import { previewLyrics, sceneModes } from './sceneModes'
+import {
+  isLegacySceneLayout,
+  legacySceneModes,
+  previewLyrics,
+  sceneModeChoices,
+} from './sceneModes'
+import { hasVisualizer } from '../visualizer/registry'
+import { useVisualizerBridge } from '../visualizer/useVisualizerBridge'
+import VisualizerRenderer from '../visualizer/VisualizerRenderer.vue'
 import { shotPalette, shotVariant } from './lyricStoryboard'
 import PlaybackSeekBar from '../player/PlaybackSeekBar.vue'
 import PlaybackTransport from '../player/PlaybackTransport.vue'
@@ -113,13 +123,21 @@ const variant = computed(() =>
     preferences.value.sceneSeed
   )
 )
-const palette = computed(() =>
-  shotPalette(preferences.value.layout, variant.value)
+/**
+ * 旧 CSS 场景引擎只接受 LegacySceneLayout。偏好里存的是全集，
+ * 所以这里做一次运行时收窄；选中 visualizer 模式时旧引擎并不渲染，
+ * 取值只是为了让仍在计算的构图/光场有一个合法输入。
+ */
+const legacyLayout = computed<LegacySceneLayout>(() =>
+  isLegacySceneLayout(preferences.value.layout)
+    ? preferences.value.layout
+    : 'readable'
 )
+const palette = computed(() => shotPalette(legacyLayout.value, variant.value))
 const mode = computed(
   () =>
-    sceneModes.find(mode => mode.id === preferences.value.layout) ??
-    sceneModes[0]!
+    sceneModeChoices().find(mode => mode.id === preferences.value.layout) ??
+    legacySceneModes[0]!
 )
 const color = computed(() =>
   preferences.value.layout === 'montage' ||
@@ -139,6 +157,44 @@ function backgroundFailed() {
 }
 const seek = (positionMs: number) =>
   store.command('seek', { value: positionMs })
+
+// 已移植的 visualizer 模式走统一 renderer，其余仍走原有的 CSS 场景。
+const theme = useThemeStore()
+const ported = computed(() => hasVisualizer(preferences.value.layout))
+const { shared } = useVisualizerBridge(
+  () => ({
+    positionMs: lyricPositionMs.value,
+    lines: lines.value,
+    index: lyricIndex.value,
+    durationMs: props.preview ? previewDurationMs : snapshot.value.durationMs,
+    theme: theme.theme,
+    isDaylight: theme.isDaylight,
+    energy: props.preview ? [] : snapshot.value.energy,
+    track: track.value ?? null,
+    seed: preferences.value.sceneSeed,
+    paused: !animated.value,
+    staticMode: reducedMotion.value || preferences.value.quality === 'power',
+    isPreviewMode: props.preview,
+    // 上游 lyricsFontScale 以 1 为基准；SOEI 的 lyricSize 默认 42px，所以以它为 1。
+    lyricsFontScale: preferences.value.lyricSize / 42,
+    frameRate: preferences.value.quality === 'high' ? 60 : 30,
+    tunings: preferences.value.visualizerTunings,
+  }),
+  // 回调参数是歌词时间轴上的秒数，扣除偏移后才是媒体时间。
+  lyricTimeSec => {
+    if (props.preview) return
+    void seek(
+      Math.max(
+        0,
+        lyricTimeSec * 1000 -
+          preferences.value.lyricOffset -
+          (track.value
+            ? (preferences.value.trackOffsets[track.value.id] ?? 0)
+            : 0)
+      )
+    )
+  }
+)
 function volume(event: Event) {
   void store.command('volume', {
     value: Number((event.target as HTMLInputElement).value),
@@ -166,7 +222,7 @@ function volume(event: Event) {
       :background="background"
       :video="video"
       :color="color"
-      :layout="preferences.layout"
+      :layout="legacyLayout"
       :variant="variant"
       :animated="animated"
       :reduced-motion="reducedMotion"
@@ -188,12 +244,13 @@ function volume(event: Event) {
       }}
     </div>
     <LyricStage
+      v-if="!ported"
       :track="track"
       :lines="lines"
       :index="lyricIndex"
       :position-ms="lyricPositionMs"
       :duration-ms="preview ? previewDurationMs : snapshot.durationMs"
-      :layout="preferences.layout"
+      :layout="legacyLayout"
       :seed="preferences.sceneSeed"
       :animated="animated"
       :reduced-motion="reducedMotion || preferences.quality === 'power'"
@@ -298,6 +355,13 @@ function volume(event: Event) {
         </div>
       </template>
     </LyricStage>
+    <!-- 已移植的 visualizer 模式：外壳与背景由 renderer 统一处理。 -->
+    <VisualizerRenderer
+      v-else
+      class="absolute inset-0"
+      :mode="preferences.layout"
+      :shared="shared"
+    />
     <div
       v-if="
         !wallpaper &&

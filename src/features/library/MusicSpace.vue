@@ -12,11 +12,7 @@ import { storeToRefs } from 'pinia'
 import { useMusicStore } from '../../stores/music'
 import { useThemeStore } from '../../stores/theme'
 import { call, desktop, onNative } from '../../bridge/native'
-import {
-  AppIcon,
-  UiButton,
-  UiIconButton,
-} from '../../components/ui'
+import { AppIcon, UiButton, UiIconButton } from '../../components/ui'
 import AppShell from '../shell/AppShell.vue'
 import AppSidebar from '../shell/AppSidebar.vue'
 import AppTitleBar from '../shell/AppTitleBar.vue'
@@ -31,6 +27,7 @@ import SettingsDialog from '../settings/SettingsDialog.vue'
 import WallpaperDialog from '../wallpaper/WallpaperDialog.vue'
 import WallpaperPlayer from '../wallpaper/WallpaperPlayer.vue'
 import { useWallpaperPlayerWindow } from '../wallpaper/useWallpaperPlayerWindow'
+import { useCoverDrift } from '../visual/useCoverDrift'
 import type { Track } from '../../types/music'
 import Artwork from '../../components/ui/Artwork.vue'
 const store = useMusicStore()
@@ -99,6 +96,12 @@ const {
 })
 const musicInput = useTemplateRef<HTMLInputElement>('musicInput')
 const lyricInput = useTemplateRef<HTMLInputElement>('lyricInput')
+// 漂移挂在 Transition 外层的稳定节点上，换歌时动画不会重启。
+const coverDrift = useTemplateRef<HTMLElement>('coverDrift')
+useCoverDrift(coverDrift, () => ({
+  strength: preferences.value.quality === 'power' ? 0 : 1,
+  reducedMotion: preferences.value.reducedMotion,
+}))
 let hideTimer: ReturnType<typeof setTimeout> | undefined
 let noticeTimer: ReturnType<typeof setTimeout> | undefined
 let ambientTimer: ReturnType<typeof setTimeout> | undefined
@@ -305,10 +308,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="music-space-root"
-    :class="{
-      'reduced-motion': preferences.reducedMotion,
-      'is-fullscreen': fullscreen,
-    }"
+    :class="{ 'reduced-motion': preferences.reducedMotion }"
   >
     <!-- 壁纸小窗是独立的 560×310 窗口形态，不套应用外壳。 -->
     <WallpaperPlayer
@@ -324,22 +324,27 @@ onBeforeUnmount(() => {
     />
     <AppShell v-else>
       <template #background>
-        <Transition
-          name="ambient-cover"
-          appear
-          ><div
-            v-if="backgroundTrack"
-            :key="backgroundTrack.id"
-            class="library-cover-layer"
-          >
-            <Artwork
-              class="library-cover-background"
-              eager
-              :artwork="backgroundTrack.artwork"
-              :src="backgroundTrack.coverRef"
-              :title="backgroundTrack.title"
-            /></div
-        ></Transition>
+        <div
+          ref="coverDrift"
+          class="library-cover-drift"
+        >
+          <Transition
+            name="ambient-cover"
+            appear
+            ><div
+              v-if="backgroundTrack"
+              :key="backgroundTrack.id"
+              class="library-cover-layer"
+            >
+              <Artwork
+                class="library-cover-background"
+                eager
+                :artwork="backgroundTrack.artwork"
+                :src="backgroundTrack.coverRef"
+                :title="backgroundTrack.title"
+              /></div
+          ></Transition>
+        </div>
         <span class="library-cover-shade" />
         <span class="ambient-beam" /><span class="ambient-reflection" />
       </template>
@@ -554,14 +559,10 @@ onBeforeUnmount(() => {
   </div>
 </template>
 <style scoped>
-.music-space {
-  --navigation-height: 112px;
-  padding: calc(var(--navigation-height) + 24px) 3vw 166px;
-}
-.music-space.is-wallpaper-player {
-  padding: 0;
-  height: 100dvh;
-  overflow: hidden;
+/* 根容器不参与布局：AppShell 是 fixed inset-0，弹层各自 fixed，
+   这里只承载 reduced-motion / is-fullscreen 这类全局修饰 class。 */
+.music-space-root {
+  display: contents;
 }
 .compact-queue {
   top: 42px;
@@ -569,9 +570,11 @@ onBeforeUnmount(() => {
   overflow-y: auto;
   border-radius: var(--radius-panel);
 }
+/* 内容区自己滚动，所以留白写在内容上而不是窗口上。 */
 .library-view {
   max-width: 1280px;
   margin: 0 auto;
+  padding: 26px 0 32px;
 }
 .library-note {
   margin: 4px 28px 20px;
@@ -581,9 +584,13 @@ onBeforeUnmount(() => {
   color: #cecec4;
 }
 .space-colophon {
-  max-width: 1280px;
   padding: 20px 28px 0;
   opacity: 0.65;
+}
+.library-cover-drift {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
 }
 .library-cover-layer {
   position: absolute;
@@ -603,9 +610,6 @@ onBeforeUnmount(() => {
   background:
     linear-gradient(180deg, #04090880, #04090825 50%, #040908b0),
     linear-gradient(90deg, #04090850, transparent 60%, #04090840);
-}
-.ambient-background {
-  background: var(--gradient-space);
 }
 .ambient-beam {
   position: absolute;
@@ -632,9 +636,13 @@ onBeforeUnmount(() => {
     color-mix(in srgb, var(--ambient-color) 10%, transparent),
     transparent 65%
   );
+  transition: background var(--motion-ambient);
 }
-.has-window-strip .scene-view {
-  top: var(--spacing-window-strip);
+/* 歌词舞台铺满外壳的 body 区：覆盖侧栏与内容区，标题栏与播放条留在外面。 */
+.scene-view {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-scene);
 }
 .scene-controls {
   transition: opacity var(--motion-controls);
@@ -651,16 +659,13 @@ onBeforeUnmount(() => {
   border-color: var(--color-danger-soft);
 }
 @media (max-width: 1000px) {
-  .music-space {
-    --navigation-height: 160px;
-  }
   .library-motto {
     width: 100px;
   }
 }
 @media (max-width: 600px) {
-  .music-space {
-    padding: calc(var(--navigation-height) + 18px) 12px 110px;
+  .library-view {
+    padding: 16px 0 24px;
   }
   .library-note {
     margin: 8px 18px 18px;

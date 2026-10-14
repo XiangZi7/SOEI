@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import KineticLyrics from './KineticLyrics.vue'
 import CoverComposition from './CoverComposition.vue'
-import type { LyricLine, SceneLayout, Track } from '../../types/music'
+import type { LyricLine, LegacySceneLayout, Track } from '../../types/music'
 import Artwork from '../../components/ui/Artwork.vue'
 import { isKineticLayout, shotVariant } from './lyricStoryboard'
 import { useLyricTransitions } from './useLyricTransitions'
@@ -16,7 +16,7 @@ const props = defineProps<{
   index: number
   positionMs?: number
   durationMs?: number
-  layout: SceneLayout
+  layout: LegacySceneLayout
   seed: number
   animated: boolean
   reducedMotion: boolean

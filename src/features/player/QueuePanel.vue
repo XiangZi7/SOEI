@@ -57,7 +57,13 @@ function addToPlaylist(trackId: string, event: Event) {
         @click="$emit('close')"
       />
     </div>
-    <div :class="props.docked ? 'min-h-0 flex-1 overflow-y-auto' : 'max-h-[50vh] overflow-y-auto'">
+    <div
+      :class="
+        props.docked
+          ? 'min-h-0 flex-1 overflow-y-auto'
+          : 'max-h-[50vh] overflow-y-auto'
+      "
+    >
       <div
         v-for="(track, index) in queueTracks"
         :key="track.id + '-' + index"
