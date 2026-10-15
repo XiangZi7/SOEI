@@ -60,7 +60,10 @@ Adaptations:
 | `easing.ts` | cubic-bezier solver equivalent to `tempera/temperaMotionEasing.ts` |
 | `partita/partitaLayout.ts`, `partita/partitaFrame.ts`, `partita/PartitaLine.vue`, `partita/VisualizerPartita.vue` | `src/components/visualizer/partita/VisualizerPartita.tsx` and `partita/README.md` |
 | `partita/entry.ts`, `partita/PartitaSettingsPanel.vue` | `src/components/visualizer/partita/entry.tsx`, partita tuning defaults and settings panel |
+| `claddagh/claddaghGeometry.ts`, `claddagh/claddaghFrame.ts`, `claddagh/CladdaghRing.vue`, `claddagh/VisualizerCladdagh.vue` | `src/components/visualizer/claddagh/VisualizerCladdagh.tsx` |
+| `claddagh/entry.ts`, `claddagh/CladdaghSettingsPanel.vue` | `src/components/visualizer/claddagh/entry.tsx`, claddagh tuning defaults and settings panel |
 | `wordReveal.ts` | word-level reveal shared verbatim by upstream `classic` and `partita` |
+| `easing.ts` (`springStep`) | analytic step response replacing framer-motion `spring()` in `classic`, `partita` and `claddagh` |
 | `subtitleOverlay.ts`, `VisualizerSubtitleOverlay.vue` | `src/components/visualizer/VisualizerSubtitleOverlay.tsx` |
 
 Adaptations:
@@ -77,6 +80,11 @@ Adaptations:
 - `easing.ts` reimplements the upstream cubic-bezier solver as a shared module, since several modes specify exact CSS curves (tilt `0.25/0.46/0.45/0.94`, tempera `0.22/1/0.36/1`) that absolute-time evaluation has to sample in JS.
 - `wordReveal.ts` extracts the word-level reveal that upstream duplicates verbatim between `classic` and `partita` (render profile, active end, display duration, and the layout/body variants). Keeping two copies would let them drift; `classic/classicLayout.ts` and `classic/classicFrame.ts` now alias the shared implementation so their public API is unchanged.
 - Upstream partita defines `getTargetColumnCount` but never calls it: `buildSequentialColumns` always emits exactly one column, and the real structure is the chunks inside it. That dead branch is not ported.
+- The claddagh renderer keeps the upstream pseudo-3D projection exactly (depth `(cos ψ + 1) / 2`, spacing factor `0.35 + 0.65·D^1.2`, scale `(0.22 + 0.98·D^1.5)`, blur `8·(1 − D)`), but drives ψ from the playback clock instead of a framer `MotionValue` chain. Ring rotation uses the analytic step response for stiffness 55 / damping 14 / mass 0.9, so seeking lands mid-rotation at the correct angle rather than replaying it; jumps of more than one line snap instead of sweeping a long arc.
+- Upstream measures arc spacing inside each ring component. SOEI computes it once in the parent and passes it down, because the parent already needs the active line's spacing for back-follow and matching child instances through `.dataset` would be fragile. Grapheme widths are measured through `@chenglou/pretext` behind a 240-entry LRU cache and fall back to visual-length estimation when measurement is unavailable.
+- Zero-duration graphemes (the gap characters SOEI's timeline produces for punctuation and spaces) are given at least 60 ms each by borrowing from neighbours, never pushing a neighbour below 40 ms. Without this they would collapse onto a single angle and stack on top of each other.
+- Claddagh glow uses the same `filter: drop-shadow()` chain as `wordGlow.ts` for the reason recorded above; the chorus variant stacks three layers with a deliberately weak middle layer (alpha 0.2), which is what produces the upstream halo rather than a flat bloom.
+- A line's render window is extended to the next line's start minus 0.34 s so the ring keeps drifting through instrumental gaps instead of freezing on the last grapheme. When the clock resets before the line index commits, the completed frame is held for that one tick — otherwise the old line would briefly render at time 0.
 - Partita falls back to one synthetic full-line unit when a line has no word timings. SOEI emits an empty `words` array for ordinary LRC, so `buildPostLyricLayoutUnits` returns nothing and the mode would render blank; the fallback shows the complete line without singing glow.
 - `useVisualizerFrame.ts` is SOEI-specific: one DOM frame loop per stage, bounded by the selected quality. Optional non-reactive time subscriptions repaint a paused Seek without a continuous loop, and are removed on source changes or disposal.
 - `useVisualizerBridge.ts` and the seconds/milliseconds boundary are SOEI-specific and not ported from upstream. Conversion inputs are isolated in computed values so a host getter that creates a fresh snapshot does not rebuild the full lyric array on each position update.

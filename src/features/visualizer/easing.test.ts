@@ -67,3 +67,64 @@ describe('插值辅助', () => {
     expect(lerp(2, 8, 0.5)).toBe(5)
   })
 })
+
+describe('解析 spring 阶跃响应', () => {
+  // 上游 classic/partita 的词级入场。
+  const word = springStep(200, 20)
+  // 上游 claddagh 的整环旋转。
+  const ring = springStep(55, 14, 0.9)
+
+  it('t<=0 为 0，长时间后收敛到 1', () => {
+    for (const spring of [word, ring]) {
+      expect(spring(0)).toBe(0)
+      expect(spring(-1)).toBe(0)
+      expect(spring(20)).toBeCloseTo(1, 6)
+    }
+  })
+  it('欠阻尼情形与手写的 200/20 闭式解一致', () => {
+    // 1 - e^(-10t)(cos10t + sin10t)：ζωn 与 ωd 都正好是 10，所以系数为 1。
+    const reference = (t: number) =>
+      1 - Math.exp(-10 * t) * (Math.cos(10 * t) + Math.sin(10 * t))
+    for (const t of [0.05, 0.1, 0.2, 0.35, 0.5])
+      expect(word(t)).toBeCloseTo(reference(t), 10)
+  })
+  it('settleSec 之后钳到 1', () => {
+    const settled = springStep(200, 20, 1, 0.7)
+    expect(settled(0.7)).toBe(1)
+    expect(settled(0.69)).toBeLessThan(1)
+  })
+  it('欠阻尼会过冲，临界与过阻尼不会', () => {
+    // 200/20 的 ζ≈0.707，必然过冲。
+    let peak = 0
+    for (let t = 0; t <= 2; t += 0.005) peak = Math.max(peak, word(t))
+    expect(peak).toBeGreaterThan(1)
+
+    // 临界阻尼：c = 2√(km)。
+    const critical = springStep(100, 2 * Math.sqrt(100), 1)
+    for (let t = 0; t <= 3; t += 0.01)
+      expect(critical(t)).toBeLessThanOrEqual(1)
+
+    const over = springStep(100, 60, 1)
+    for (let t = 0; t <= 3; t += 0.01) expect(over(t)).toBeLessThanOrEqual(1)
+  })
+  it('claddagh 的 55/14/0.9 几乎临界阻尼，过冲极小', () => {
+    let peak = 0
+    for (let t = 0; t <= 4; t += 0.005) peak = Math.max(peak, ring(t))
+    expect(peak).toBeGreaterThan(0.999)
+    // ζ≈0.995，所以过冲不到 1%。
+    expect(peak).toBeLessThan(1.01)
+  })
+  it('三种阻尼情形都单调起步且有限', () => {
+    for (const spring of [
+      word,
+      ring,
+      springStep(100, 20, 1),
+      springStep(80, 90, 1),
+    ])
+      for (let t = 0; t <= 3; t += 0.01) {
+        const value = spring(t)
+        expect(Number.isFinite(value)).toBe(true)
+        expect(value).toBeGreaterThanOrEqual(0)
+      }
+  })
+})

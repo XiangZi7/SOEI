@@ -24,6 +24,9 @@ const TiltSettingsPanel = defineAsyncComponent(
 const PartitaSettingsPanel = defineAsyncComponent(
   () => import('../visualizer/partita/PartitaSettingsPanel.vue')
 )
+const CladdaghSettingsPanel = defineAsyncComponent(
+  () => import('../visualizer/claddagh/CladdaghSettingsPanel.vue')
+)
 const props = defineProps<{ initialCategory?: string; windowed?: boolean }>()
 const emit = defineEmits<{ close: []; lyrics: [] }>()
 const store = useMusicStore()
@@ -304,6 +307,16 @@ async function applyShortcuts(clear = false) {
               preferences.visualizerTunings = {
                 ...preferences.visualizerTunings,
                 partita: $event,
+              }
+            "
+          />
+          <CladdaghSettingsPanel
+            v-else-if="preferences.layout === 'claddagh'"
+            :tuning="preferences.visualizerTunings?.claddagh"
+            @update:tuning="
+              preferences.visualizerTunings = {
+                ...preferences.visualizerTunings,
+                claddagh: $event,
               }
             "
           />

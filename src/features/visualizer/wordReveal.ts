@@ -15,7 +15,7 @@ import {
   wordGlowFilter,
   type WordGlowTiming,
 } from './wordGlow'
-import { clamp01, lerp } from './easing'
+import { clamp01, lerp, springStep } from './easing'
 
 // 词级揭示：行的时序档案 + waiting/active/passed 三态 + 逐帧求值。
 //
@@ -122,17 +122,9 @@ export interface PreparedRevealWord {
 const easeOut = (progress: number) => 1 - (1 - clamp01(progress)) ** 3
 /**
  * 上游 spring(stiffness=200, damping=20, mass=1) 的解析阶跃响应。
- * ωn=√200≈14.14，ζ=20/(2√200)≈0.707，ωd=ωn√(1-ζ²)≈10，且 ζωn=10，
- * 所以 1 - e^(-10t)(cos10t + sin10t)。不依赖历史帧，Seek 可直接求值。
+ * 0.7 秒之后钳到 1 —— 指数尾巴理论上无限长，钳位给「已经到位」一个明确边界。
  */
-const spring = (elapsed: number) =>
-  elapsed <= 0
-    ? 0
-    : elapsed >= 0.7
-      ? 1
-      : 1 -
-        Math.exp(-10 * elapsed) *
-          (Math.cos(10 * elapsed) + Math.sin(10 * elapsed))
+const spring = springStep(200, 20, 1, 0.7)
 
 export interface WordRevealFrame {
   status: WordRevealStatus

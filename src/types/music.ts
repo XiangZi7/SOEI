@@ -131,7 +131,8 @@ export type LegacySceneLayout =
  * 模式落地时才加进这个联合 —— 类型不应声称存在还没实现的模式。
  * 目标集合（14 个）见 docs/LYRICS_ENGINE.md 的移植计划。
  */
-export type VisualizerLayout = 'still' | 'classic' | 'tilt' | 'partita'
+export type VisualizerLayout =
+  'still' | 'classic' | 'tilt' | 'partita' | 'claddagh'
 export type SceneLayout = LegacySceneLayout | VisualizerLayout
 export interface Playlist {
   id: string

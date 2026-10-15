@@ -3,7 +3,7 @@ import type { Line } from '../../lyrics/folia/model'
 import { buildWordGraphemeTimings } from '../../lyrics/folia/graphemeTiming'
 import { resolveWordColor } from '../../lyrics/folia/wordColoring'
 import { colorWithAlpha } from '../../theme/colorMath'
-import { clamp01, lerp } from '../easing'
+import { clamp01, lerp, springStep } from '../easing'
 import { wordGlowTiming } from '../wordGlow'
 import {
   resolveWordRevealProfile,
@@ -126,15 +126,8 @@ export function partitaChunkStatus(
 }
 
 const easeOut = (progress: number) => 1 - (1 - clamp01(progress)) ** 3
-/** 与词级同一条 spring(200, 20) 的解析阶跃响应。 */
-const spring = (elapsed: number) =>
-  elapsed <= 0
-    ? 0
-    : elapsed >= 0.7
-      ? 1
-      : 1 -
-        Math.exp(-10 * elapsed) *
-          (Math.cos(10 * elapsed) + Math.sin(10 * elapsed))
+/** 与词级同一条 spring(200, 20)，走共享的解析阶跃响应。 */
+const spring = springStep(200, 20, 1, 0.7)
 
 export interface PartitaChunkFrame {
   status: WordRevealStatus
