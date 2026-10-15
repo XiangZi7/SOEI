@@ -1,16 +1,17 @@
 import type { Line, Word } from '../../lyrics/folia/model'
-import {
-  getLineRenderEndTime,
-  getLineRenderHints,
-  type LineRenderHints,
-  type LineTransitionMode,
-  type WordRevealMode,
-} from '../../lyrics/folia/renderHints'
 import type { Theme } from '../../theme/model'
 import {
   resolveThemeFontStack,
   resolveThemeFontWeight,
 } from '../../theme/fontStacks'
+import {
+  resolveWordRevealProfile,
+  wordActiveEndTime,
+  wordDisplayDuration,
+  wordRevealStatus,
+  type WordRevealProfile,
+  type WordRevealStatus,
+} from '../wordReveal'
 
 // classic（Luminous）的纯布局与时序。从 Folia classic/Visualizer.tsx 抽出，
 // 与 Vue 组件分离，便于单测。
@@ -73,85 +74,14 @@ export function resolveClassicTuning(tuning?: unknown): ClassicTuning {
   }
 }
 
-export interface ClassicLineRenderProfile {
-  renderHints: LineRenderHints | null
-  lineRenderEndTime: number
-  lineTransitionMode: LineTransitionMode
-  wordRevealMode: WordRevealMode
-  wordLookahead: number
-}
-
-/**
- * renderHints 来自歌词流水线，不是 visualizer 自己算的；
- * 这里只是把它重新打包成逐帧更好消费的形状。
- */
-export function resolveClassicLineRenderProfile(
-  line: Line | null | undefined
-): ClassicLineRenderProfile | null {
-  if (!line) return null
-  const renderHints = getLineRenderHints(line)
-  const wordRevealMode = renderHints?.wordRevealMode ?? 'normal'
-  return {
-    renderHints,
-    lineRenderEndTime: getLineRenderEndTime(line),
-    lineTransitionMode: renderHints?.lineTransitionMode ?? 'normal',
-    wordRevealMode,
-    wordLookahead:
-      wordRevealMode === 'instant'
-        ? 0.03
-        : wordRevealMode === 'fast'
-          ? 0.08
-          : 0.15,
-  }
-}
-
-export function getClassicWordActiveEndTime(
-  word: Word,
-  profile: ClassicLineRenderProfile
-): number {
-  if (profile.wordRevealMode === 'instant') return profile.lineRenderEndTime
-  if (profile.wordRevealMode === 'fast')
-    return Math.min(
-      profile.lineRenderEndTime,
-      Math.max(word.endTime, word.startTime + 0.12)
-    )
-  return word.endTime
-}
-
-export function getClassicWordDisplayDuration(
-  word: Word,
-  profile: ClassicLineRenderProfile
-): number {
-  const activeEndTime = getClassicWordActiveEndTime(word, profile)
-  const minDuration =
-    profile.wordRevealMode === 'instant'
-      ? 0.08
-      : profile.wordRevealMode === 'fast'
-        ? 0.12
-        : 0.1
-  return Math.max(activeEndTime - word.startTime, minDuration)
-}
-
-export type ClassicWordStatus = 'waiting' | 'active' | 'passed'
-
-/**
- * 按绝对播放时间求词的状态。上游在 framer 的 useMotionValueEvent 里做同样的判断；
- * 抽成纯函数后既可单测，也能在 rAF 里直接调用。
- */
-export function classicWordStatus(
-  timeSec: number,
-  word: Word,
-  profile: ClassicLineRenderProfile
-): ClassicWordStatus {
-  const activeEndTime = getClassicWordActiveEndTime(word, profile)
-  if (
-    timeSec >= word.startTime - profile.wordLookahead &&
-    timeSec <= activeEndTime
-  )
-    return 'active'
-  if (timeSec > activeEndTime) return 'passed'
-  return 'waiting'
-}
+// 行时序与词状态是 classic 与 partita 共用的，实现收在 ../wordReveal.ts；
+// 这里保留 classic 的名字作为别名，调用方与测试不受影响。
+export type ClassicLineRenderProfile = WordRevealProfile
+export type ClassicWordStatus = WordRevealStatus
+export const resolveClassicLineRenderProfile = resolveWordRevealProfile
+export const getClassicWordActiveEndTime = wordActiveEndTime
+export const getClassicWordDisplayDuration = wordDisplayDuration
+export const classicWordStatus = wordRevealStatus
 
 export interface ClassicLineConfig {
   justifyContent: string

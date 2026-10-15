@@ -55,6 +55,12 @@ Adaptations:
 | `still/VisualizerStill.vue` | `src/components/visualizer/still/VisualizerStill.tsx` |
 | `classic/classicLayout.ts`, `classic/classicFrame.ts`, `classic/ClassicLine.vue`, `classic/VisualizerClassic.vue` | `src/components/visualizer/classic/Visualizer.tsx` |
 | `classic/entry.ts`, `classic/ClassicSettingsPanel.vue` | `src/components/visualizer/classic/entry.tsx`, classic tuning defaults and settings panel |
+| `tilt/tiltLayout.ts`, `tilt/tiltFrame.ts`, `tilt/TiltLine.vue`, `tilt/VisualizerTilt.vue` | `src/components/visualizer/tilt/VisualizerTilt.tsx` |
+| `tilt/entry.ts`, `tilt/TiltSettingsPanel.vue` | `src/components/visualizer/tilt/entry.tsx`, tilt tuning defaults and settings panel |
+| `easing.ts` | cubic-bezier solver equivalent to `tempera/temperaMotionEasing.ts` |
+| `partita/partitaLayout.ts`, `partita/partitaFrame.ts`, `partita/PartitaLine.vue`, `partita/VisualizerPartita.vue` | `src/components/visualizer/partita/VisualizerPartita.tsx` and `partita/README.md` |
+| `partita/entry.ts`, `partita/PartitaSettingsPanel.vue` | `src/components/visualizer/partita/entry.tsx`, partita tuning defaults and settings panel |
+| `wordReveal.ts` | word-level reveal shared verbatim by upstream `classic` and `partita` |
 | `subtitleOverlay.ts`, `VisualizerSubtitleOverlay.vue` | `src/components/visualizer/VisualizerSubtitleOverlay.tsx` |
 
 Adaptations:
@@ -67,6 +73,11 @@ Adaptations:
 - `definition.ts` collapses the upstream per-mode tuning props into one `tunings` record, and expresses "this mode mounts no background" (upstream `renderBackground={false}`) as a registry field, because SOEI applies the shared shell in the renderer rather than in each mode.
 - The classic renderer replaces framer-motion's stateful transitions with absolute-time word, line and glow evaluation. Spring entry uses the analytic response for stiffness 200 / damping 20; breathing uses a bounded sinusoid. The current line is replaced on line changes rather than recreating framer-motion's overlapping pop-layout exit. Layout keeps the upstream start-time seed by default and adds SOEI's scene seed for "换个分镜".
 - Ordinary LRC has no measured word timing in SOEI. Classic displays its complete line without singing glow; missing spaces and punctuation are retained, and unalignable tokens fall back to the full line. Reduced-motion and power modes show complete static text.
+- The tilt renderer likewise replaces framer-motion with absolute-time evaluation: segment and per-grapheme reveal are solved from the playback clock through `easing.ts` rather than played as CSS/framer transitions with delays, so seeking lands on the correct frame instead of restarting the entry. Whitespace graphemes are excluded from both the reveal stagger and the up/down alternation — indexing them would delay the rest of a spaced line by one step and invert its stagger phase. Per-grapheme timing lives only in the parent so the whole stage runs one frame loop.
+- `easing.ts` reimplements the upstream cubic-bezier solver as a shared module, since several modes specify exact CSS curves (tilt `0.25/0.46/0.45/0.94`, tempera `0.22/1/0.36/1`) that absolute-time evaluation has to sample in JS.
+- `wordReveal.ts` extracts the word-level reveal that upstream duplicates verbatim between `classic` and `partita` (render profile, active end, display duration, and the layout/body variants). Keeping two copies would let them drift; `classic/classicLayout.ts` and `classic/classicFrame.ts` now alias the shared implementation so their public API is unchanged.
+- Upstream partita defines `getTargetColumnCount` but never calls it: `buildSequentialColumns` always emits exactly one column, and the real structure is the chunks inside it. That dead branch is not ported.
+- Partita falls back to one synthetic full-line unit when a line has no word timings. SOEI emits an empty `words` array for ordinary LRC, so `buildPostLyricLayoutUnits` returns nothing and the mode would render blank; the fallback shows the complete line without singing glow.
 - `useVisualizerFrame.ts` is SOEI-specific: one DOM frame loop per stage, bounded by the selected quality. Optional non-reactive time subscriptions repaint a paused Seek without a continuous loop, and are removed on source changes or disposal.
 - `useVisualizerBridge.ts` and the seconds/milliseconds boundary are SOEI-specific and not ported from upstream. Conversion inputs are isolated in computed values so a host getter that creates a fresh snapshot does not rebuild the full lyric array on each position update.
 - `src-tauri/src/audio.rs` adopts the upstream `AudioBands` band split (bass/lowMid/mid/vocal/treble, with mid and vocal deliberately overlapping); the FFT, windowing and smoothing remain SOEI's own.

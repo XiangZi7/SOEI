@@ -18,6 +18,12 @@ import { settingsCategory } from './categories'
 const ClassicSettingsPanel = defineAsyncComponent(
   () => import('../visualizer/classic/ClassicSettingsPanel.vue')
 )
+const TiltSettingsPanel = defineAsyncComponent(
+  () => import('../visualizer/tilt/TiltSettingsPanel.vue')
+)
+const PartitaSettingsPanel = defineAsyncComponent(
+  () => import('../visualizer/partita/PartitaSettingsPanel.vue')
+)
 const props = defineProps<{ initialCategory?: string; windowed?: boolean }>()
 const emit = defineEmits<{ close: []; lyrics: [] }>()
 const store = useMusicStore()
@@ -278,6 +284,26 @@ async function applyShortcuts(clear = false) {
               preferences.visualizerTunings = {
                 ...preferences.visualizerTunings,
                 classic: $event,
+              }
+            "
+          />
+          <TiltSettingsPanel
+            v-else-if="preferences.layout === 'tilt'"
+            :tuning="preferences.visualizerTunings?.tilt"
+            @update:tuning="
+              preferences.visualizerTunings = {
+                ...preferences.visualizerTunings,
+                tilt: $event,
+              }
+            "
+          />
+          <PartitaSettingsPanel
+            v-else-if="preferences.layout === 'partita'"
+            :tuning="preferences.visualizerTunings?.partita"
+            @update:tuning="
+              preferences.visualizerTunings = {
+                ...preferences.visualizerTunings,
+                partita: $event,
               }
             "
           />
