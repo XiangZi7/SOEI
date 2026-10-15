@@ -27,6 +27,9 @@ const PartitaSettingsPanel = defineAsyncComponent(
 const CladdaghSettingsPanel = defineAsyncComponent(
   () => import('../visualizer/claddagh/CladdaghSettingsPanel.vue')
 )
+const CadenzaSettingsPanel = defineAsyncComponent(
+  () => import('../visualizer/cadenza/CadenzaSettingsPanel.vue')
+)
 const props = defineProps<{ initialCategory?: string; windowed?: boolean }>()
 const emit = defineEmits<{ close: []; lyrics: [] }>()
 const store = useMusicStore()
@@ -317,6 +320,16 @@ async function applyShortcuts(clear = false) {
               preferences.visualizerTunings = {
                 ...preferences.visualizerTunings,
                 claddagh: $event,
+              }
+            "
+          />
+          <CadenzaSettingsPanel
+            v-else-if="preferences.layout === 'cadenza'"
+            :tuning="preferences.visualizerTunings?.cadenza"
+            @update:tuning="
+              preferences.visualizerTunings = {
+                ...preferences.visualizerTunings,
+                cadenza: $event,
               }
             "
           />
