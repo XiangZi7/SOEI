@@ -14,7 +14,9 @@ const props = defineProps<{
 }>()
 
 const entry = computed(() =>
-  props.transparent ? undefined : visualizerBackgroundEntry(props.mode ?? undefined)
+  props.transparent
+    ? undefined
+    : visualizerBackgroundEntry(props.mode ?? undefined)
 )
 </script>
 

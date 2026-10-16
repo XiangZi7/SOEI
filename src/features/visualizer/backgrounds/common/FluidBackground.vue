@@ -33,12 +33,15 @@ let nextKey = 0
  */
 watch(
   () => props.coverUrl,
-  coverUrl => {
+  (coverUrl, _previous, onCleanup) => {
     if (!coverUrl) {
       state.layers = []
       return
     }
     let cancelled = false
+    onCleanup(() => {
+      cancelled = true
+    })
     void buildDownscaledCover(coverUrl).then(smallUrl => {
       if (cancelled) return
       const top = state.layers[state.layers.length - 1]
@@ -47,12 +50,14 @@ watch(
       // 只保留当前顶层（给它淡出）加上新来的这张。
       state.layers = [
         ...(top ? [top] : []),
-        { url: smallUrl ?? coverUrl, source: coverUrl, key: nextKey, ready: false },
+        {
+          url: smallUrl ?? coverUrl,
+          source: coverUrl,
+          key: nextKey,
+          ready: false,
+        },
       ]
     })
-    return () => {
-      cancelled = true
-    }
   },
   { immediate: true }
 )
@@ -102,7 +107,8 @@ function dropBroken(layer: CoverLayer) {
         class="fluid-cover-wrapper"
         :class="{
           'is-visible':
-            layer.ready || layer.key !== state.layers[state.layers.length - 1]?.key,
+            layer.ready ||
+            layer.key !== state.layers[state.layers.length - 1]?.key,
         }"
         @transitionend="pruneBelow(layer)"
       >

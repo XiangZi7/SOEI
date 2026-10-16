@@ -9,20 +9,11 @@ import { seededRandom } from '../../../theme/generateTheme'
 // SOEI 的「换个分镜」与预览图都要求可复现，所以改成用 seed 驱动 mulberry32。
 
 export type GeometricShapeType =
-  | 'circle'
-  | 'square'
-  | 'triangle'
-  | 'cross'
-  | 'icon'
+  'circle' | 'square' | 'triangle' | 'cross' | 'icon'
 
 /** 形状跟随哪个频段缩放。 */
 export type GeometricBandKey =
-  | 'bass'
-  | 'lowMid'
-  | 'mid'
-  | 'vocal'
-  | 'treble'
-  | 'power'
+  'bass' | 'lowMid' | 'mid' | 'vocal' | 'treble' | 'power'
 
 export interface GeometricShape {
   id: number
@@ -107,7 +98,10 @@ export function geometricClipPath(type: GeometricShapeType): string {
  * 这样观感与上游一致而不是凭空换一套曲线。
  */
 export function geometricShapeScale(normalized: number): number {
-  const raw = Math.max(10, Math.min(Number.isFinite(normalized) ? normalized * 255 : 0, 200))
+  const raw = Math.max(
+    10,
+    Math.min(Number.isFinite(normalized) ? normalized * 255 : 0, 200)
+  )
   return 0.95 + ((raw - 10) / 190) * 0.5
 }
 

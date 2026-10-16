@@ -1,6 +1,7 @@
 import { computed, watch, type ComputedRef } from 'vue'
 import type { LyricLine, Track } from '../../types/music'
 import type { Theme } from '../theme/model'
+import { assetUrl } from '../../bridge/native'
 import { toFoliaLine } from '../lyrics/adapter'
 import type { Line } from '../lyrics/folia/model'
 import { createAudioSource } from './audioBands'
@@ -101,7 +102,17 @@ export function useVisualizerBridge(
       songTitle: current.track?.title ?? null,
       songArtist: current.track?.artist ?? null,
       songAlbum: current.track?.album ?? null,
-      coverUrl: current.coverUrl ?? current.track?.coverRef ?? null,
+      coverUrl:
+        current.coverUrl ||
+        current.track?.coverRef ||
+        current.track?.artwork?.source
+          ? assetUrl(
+              current.coverUrl ||
+                current.track?.coverRef ||
+                current.track?.artwork?.source ||
+                ''
+            )
+          : null,
       seed: current.seed,
       staticMode: current.staticMode,
       paused: current.paused,

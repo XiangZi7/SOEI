@@ -6,10 +6,9 @@ import type { VisualizerBackgroundRegistryEntry } from './definition'
 // 上游还有一条 mod 运行时注册通道（appendVisualizerBackgroundEntry /
 // removeVisualizerBackgroundEntry，带 `mod:<modId>:<id>` 前缀防止覆盖内置模式），
 // SOEI 没有 mod 系统，不做无消费者的空壳。
-const modules = import.meta.glob<{ default: VisualizerBackgroundRegistryEntry }>(
-  './*/entry.ts',
-  { eager: true }
-)
+const modules = import.meta.glob<{
+  default: VisualizerBackgroundRegistryEntry
+}>('./*/entry.ts', { eager: true })
 
 const entries: VisualizerBackgroundRegistryEntry[] = Object.values(modules)
   .map(module => module.default)
@@ -24,8 +23,8 @@ const byMode = new Map(entries.map(entry => [entry.mode, entry]))
 export const DEFAULT_VISUALIZER_BACKGROUND = 'common'
 
 /** 已注册的背景，按 order 排序。 */
-export const visualizerBackgroundEntries = (): readonly VisualizerBackgroundRegistryEntry[] =>
-  entries
+export const visualizerBackgroundEntries =
+  (): readonly VisualizerBackgroundRegistryEntry[] => entries
 
 export const hasVisualizerBackground = (mode: string | undefined): boolean =>
   mode !== undefined && byMode.has(mode)

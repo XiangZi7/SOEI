@@ -20,6 +20,7 @@
     "@chenglou/pretext": "^0.0.9",
     "@iconify-json/lucide": "^1.2.141",
     "@iconify/vue": "^5.0.3",
+    "@paper-design/shaders": "0.0.80",
     "@tailwindcss/vite": "^4.3.3",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",

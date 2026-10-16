@@ -76,7 +76,9 @@ function paint() {
   if (!element) return
   const now = performance.now()
   const delta =
-    previousStamp === null ? 1 / 60 : Math.min((now - previousStamp) / 1000, 0.25)
+    previousStamp === null
+      ? 1 / 60
+      : Math.min((now - previousStamp) / 1000, 0.25)
   previousStamp = now
   for (const key of Object.keys(followers) as GeometricBandKey[]) {
     const value = followers[key].step(readBand(key), delta)
@@ -99,6 +101,7 @@ function snapAll() {
 }
 
 useVisualizerFrame({
+  source: () => props.audioPower,
   running: () => !props.paused && !props.staticMode && Boolean(host.value),
   frameRate: () => props.frameRate ?? 30,
   paint,
@@ -139,7 +142,8 @@ onBeforeUnmount(() => {
           opacity: shape.opacity,
           color: theme.secondaryColor,
           border:
-            (shape.type === 'circle' || shape.type === 'square') && !shape.filled
+            (shape.type === 'circle' || shape.type === 'square') &&
+            !shape.filled
               ? `1px solid ${theme.secondaryColor}`
               : 'none',
           backgroundColor:
@@ -252,12 +256,12 @@ onBeforeUnmount(() => {
       scale(var(--geo-scale));
   }
   50% {
-    transform: translate(15px, -30px)
-      rotate(calc(var(--geo-rotation) + 180deg)) scale(var(--geo-scale));
+    transform: translate(15px, -30px) rotate(calc(var(--geo-rotation) + 180deg))
+      scale(var(--geo-scale));
   }
   100% {
-    transform: translate(-15px, 30px)
-      rotate(calc(var(--geo-rotation) + 360deg)) scale(var(--geo-scale));
+    transform: translate(-15px, 30px) rotate(calc(var(--geo-rotation) + 360deg))
+      scale(var(--geo-scale));
   }
 }
 @keyframes geo-drift-reverse {
@@ -266,12 +270,12 @@ onBeforeUnmount(() => {
       scale(var(--geo-scale));
   }
   50% {
-    transform: translate(-15px, 30px)
-      rotate(calc(var(--geo-rotation) + 180deg)) scale(var(--geo-scale));
+    transform: translate(-15px, 30px) rotate(calc(var(--geo-rotation) + 180deg))
+      scale(var(--geo-scale));
   }
   100% {
-    transform: translate(15px, -30px)
-      rotate(calc(var(--geo-rotation) + 360deg)) scale(var(--geo-scale));
+    transform: translate(15px, -30px) rotate(calc(var(--geo-rotation) + 360deg))
+      scale(var(--geo-scale));
   }
 }
 @keyframes geo-breathe {

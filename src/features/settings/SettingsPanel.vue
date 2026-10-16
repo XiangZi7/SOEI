@@ -13,6 +13,7 @@ import {
   UiSlider,
 } from '../../components/ui'
 import SettingRow from './SettingRow.vue'
+import BackgroundSettingsPanel from '../visualizer/backgrounds/BackgroundSettingsPanel.vue'
 import { sceneModeChoices } from '../visual/sceneModes'
 import { settingsCategory } from './categories'
 const ClassicSettingsPanel = defineAsyncComponent(
@@ -283,6 +284,12 @@ async function applyShortcuts(clear = false) {
               v-model="preferences.reducedMotion"
               label="减少动态效果"
           /></SettingRow>
+          <BackgroundSettingsPanel
+            :mode="preferences.visualizerBackground"
+            :tunings="preferences.backgroundTunings"
+            @update:mode="preferences.visualizerBackground = $event"
+            @update:tunings="preferences.backgroundTunings = $event"
+          />
           <ClassicSettingsPanel
             v-if="preferences.layout === 'classic'"
             :tuning="preferences.visualizerTunings?.classic"

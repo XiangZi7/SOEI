@@ -11,7 +11,7 @@ import { buildCoverDriftTrack } from './coverDrift'
  */
 export function useCoverDrift(
   element: Ref<HTMLElement | null>,
-  options: () => { strength: number; reducedMotion: boolean }
+  options: () => { strength: number; reducedMotion: boolean; paused?: boolean }
 ) {
   const visibility = useDocumentVisibility()
   let animation: Animation | undefined
@@ -43,7 +43,8 @@ export function useCoverDrift(
       appliedStrength = strength
     }
     if (!animation) return
-    if (visibility.value === 'visible') void animation.play()
+    if (visibility.value === 'visible' && !options().paused)
+      void animation.play()
     else animation.pause()
   }
 
@@ -53,6 +54,7 @@ export function useCoverDrift(
       visibility,
       () => options().strength,
       () => options().reducedMotion,
+      () => options().paused,
     ],
     sync,
     { immediate: true, flush: 'post' }

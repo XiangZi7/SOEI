@@ -216,6 +216,7 @@ function volume(event: Event) {
     aria-label="沉浸式音乐场景"
   >
     <SceneBackdrop
+      v-if="!ported"
       :track-key="track?.id"
       :artwork="track?.artwork"
       :cover="track?.coverRef"
@@ -361,7 +362,30 @@ function volume(event: Event) {
       class="absolute inset-0"
       :mode="preferences.layout"
       :shared="shared"
-    />
+      :background-mode="preferences.visualizerBackground"
+      :background-tunings="preferences.backgroundTunings"
+    >
+      <template
+        v-if="background"
+        #background
+      >
+        <SceneBackdrop
+          :track-key="track?.id"
+          :artwork="track?.artwork"
+          :cover="track?.coverRef"
+          :background="background"
+          :video="video"
+          :color="color"
+          :layout="legacyLayout"
+          :variant="variant"
+          :animated="animated"
+          :reduced-motion="reducedMotion"
+          :quality="preferences.quality"
+          :energy="energy"
+          @background-failed="backgroundFailed"
+        />
+      </template>
+    </VisualizerRenderer>
     <div
       v-if="
         !wallpaper &&

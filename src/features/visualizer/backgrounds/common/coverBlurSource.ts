@@ -39,7 +39,10 @@ export function buildDownscaledCover(
           resolve(null)
           return
         }
-        const scale = Math.min(1, maxSize / Math.max(naturalWidth, naturalHeight))
+        const scale = Math.min(
+          1,
+          maxSize / Math.max(naturalWidth, naturalHeight)
+        )
         const width = Math.max(1, Math.round(naturalWidth * scale))
         const height = Math.max(1, Math.round(naturalHeight * scale))
         const canvas = document.createElement('canvas')

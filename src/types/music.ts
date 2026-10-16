@@ -133,6 +133,7 @@ export type LegacySceneLayout =
  */
 export type VisualizerLayout =
   'still' | 'classic' | 'tilt' | 'partita' | 'claddagh' | 'cadenza'
+  | 'monet'
 export type SceneLayout = LegacySceneLayout | VisualizerLayout
 export interface Playlist {
   id: string
@@ -155,6 +156,8 @@ export interface Preferences {
   trackOffsets: Record<string, number>
   trackBackgrounds: Record<string, string>
   visualizerTunings?: Record<string, unknown>
+  visualizerBackground?: string
+  backgroundTunings?: Record<string, unknown>
 }
 export interface Display {
   id: string

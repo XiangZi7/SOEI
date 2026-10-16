@@ -39,6 +39,8 @@ export const defaultPreferences: Preferences = {
   trackOffsets: {},
   trackBackgrounds: {},
   visualizerTunings: {},
+  visualizerBackground: 'common',
+  backgroundTunings: {},
 }
 const emptySnapshot = (): PlaybackSnapshot => ({
   sessionId: 0,
