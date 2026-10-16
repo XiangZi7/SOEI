@@ -101,3 +101,56 @@ export function springStep(
     )
   }
 }
+
+/** 弹簧跟随器：持续追一个会变的目标值。 */
+export interface SpringFollower {
+  /** 推进一帧并返回新的当前值。 */
+  step(target: number, deltaSec: number): number
+  /** 直接落位（换歌、Seek、首帧）。 */
+  snap(value: number): void
+  /** 不推进时间地读当前值。 */
+  get(): number
+}
+
+/** 单个子步的最大时长。超过它弹簧积分会发散，所以按这个长度切分。 */
+const SPRING_MAX_SUBSTEP_SECONDS = 1 / 120
+
+/**
+ * framer-motion `useSpring(liveValue, { stiffness, damping, mass })` 的等价物。
+ *
+ * 与 `springStep` 的区别：`springStep` 是对**固定目标**的解析阶跃响应，用于入场动画，
+ * 任意时刻可直接求值，所以 Seek 不需要重演。这里追的是**持续变化的目标**（音频能量），
+ * 本来就不存在「从时钟复现」这回事 —— 音频响应不可回放 —— 所以用真正的积分。
+ *
+ * 用半隐式欧拉并把每帧切成 ≤1/120 秒的子步：掉帧时一大步积分会让弹簧发散，
+ * 切分后同样的 deltaSec 得到同样的结果，与帧率无关。
+ */
+export function createSpringFollower(
+  stiffness: number,
+  damping: number,
+  mass = 1,
+  initial = 0
+): SpringFollower {
+  let position = initial
+  let velocity = 0
+  return {
+    step(target, deltaSec) {
+      if (!Number.isFinite(target)) return position
+      const total = Math.max(0, Math.min(deltaSec, 0.25))
+      const steps = Math.max(1, Math.ceil(total / SPRING_MAX_SUBSTEP_SECONDS))
+      const dt = total / steps
+      for (let index = 0; index < steps; index += 1) {
+        const acceleration =
+          (-stiffness * (position - target) - damping * velocity) / mass
+        velocity += acceleration * dt
+        position += velocity * dt
+      }
+      return position
+    },
+    snap(value) {
+      position = value
+      velocity = 0
+    },
+    get: () => position,
+  }
+}
