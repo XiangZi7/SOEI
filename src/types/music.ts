@@ -132,8 +132,7 @@ export type LegacySceneLayout =
  * 目标集合（14 个）见 docs/LYRICS_ENGINE.md 的移植计划。
  */
 export type VisualizerLayout =
-  'still' | 'classic' | 'tilt' | 'partita' | 'claddagh' | 'cadenza'
-  | 'monet'
+  'still' | 'classic' | 'tilt' | 'partita' | 'claddagh' | 'cadenza' | 'monet'
 export type SceneLayout = LegacySceneLayout | VisualizerLayout
 export interface Playlist {
   id: string

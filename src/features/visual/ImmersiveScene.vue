@@ -390,6 +390,7 @@ function volume(event: Event) {
       v-if="
         !wallpaper &&
         !showcase &&
+        preferences.layout !== 'monet' &&
         !(preferences.layout === 'title' && wallpaperCover)
       "
       class="absolute bottom-[20%] left-[10%] flex flex-col gap-2 text-sm max-sm:bottom-[23%] max-sm:left-[7%]"
@@ -400,7 +401,7 @@ function volume(event: Event) {
       }}</small>
     </div>
     <div
-      v-if="!wallpaper"
+      v-if="!wallpaper && preferences.layout !== 'monet'"
       class="absolute flex items-center gap-3.5 text-[9px] tracking-wider text-stage-muted"
       :class="
         showcase

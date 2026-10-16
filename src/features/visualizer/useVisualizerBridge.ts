@@ -1,7 +1,7 @@
 import { computed, watch, type ComputedRef } from 'vue'
 import type { LyricLine, Track } from '../../types/music'
 import type { Theme } from '../theme/model'
-import { assetUrl } from '../../bridge/native'
+import { useVisualizerCover } from './useVisualizerCover'
 import { toFoliaLine } from '../lyrics/adapter'
 import type { Line } from '../lyrics/folia/model'
 import { createAudioSource } from './audioBands'
@@ -57,6 +57,10 @@ export function useVisualizerBridge(
   // 稳定实例：整个生命周期内不重建，渲染层一直读同一个对象。
   const currentTime = mutableValue(0)
   const audio = createAudioSource()
+  const cover = useVisualizerCover(() => ({
+    source: input().coverUrl ?? input().track?.coverRef,
+    artwork: input().coverUrl ? undefined : input().track?.artwork,
+  }))
 
   // 宿主 getter 会同时读取位置、主题等字段。先隔离真正决定转换的两个输入，
   // computed 的值相等检查才能挡住播放时每帧创建的新快照对象。
@@ -102,17 +106,7 @@ export function useVisualizerBridge(
       songTitle: current.track?.title ?? null,
       songArtist: current.track?.artist ?? null,
       songAlbum: current.track?.album ?? null,
-      coverUrl:
-        current.coverUrl ||
-        current.track?.coverRef ||
-        current.track?.artwork?.source
-          ? assetUrl(
-              current.coverUrl ||
-                current.track?.coverRef ||
-                current.track?.artwork?.source ||
-                ''
-            )
-          : null,
+      coverUrl: cover.value,
       seed: current.seed,
       staticMode: current.staticMode,
       paused: current.paused,

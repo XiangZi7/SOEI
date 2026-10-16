@@ -3,7 +3,6 @@
 import {
   computed,
   onBeforeUnmount,
-  onMounted,
   shallowRef,
   useTemplateRef,
   watch,
@@ -132,7 +131,7 @@ function paint() {
   )
   gl.drawArrays(gl.POINTS, 0, 150)
 }
-onMounted(initialize)
+watch(canvas, initialize, { immediate: true, flush: 'post' })
 onBeforeUnmount(dispose)
 useEventListener(canvas, 'webglcontextlost', event => {
   event.preventDefault()
@@ -165,6 +164,7 @@ useVisualizerFrame({
     :style="{ backgroundColor: isDaylight ? '#ffffff' : '#000000' }"
   >
     <canvas
+      v-if="!tuning.blank"
       ref="canvas"
       class="absolute inset-0 block size-full"
     />

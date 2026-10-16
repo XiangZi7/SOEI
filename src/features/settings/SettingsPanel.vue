@@ -16,6 +16,9 @@ import SettingRow from './SettingRow.vue'
 import BackgroundSettingsPanel from '../visualizer/backgrounds/BackgroundSettingsPanel.vue'
 import { sceneModeChoices } from '../visual/sceneModes'
 import { settingsCategory } from './categories'
+const MonetSettingsPanel = defineAsyncComponent(
+  () => import('../visualizer/monet/MonetSettingsPanel.vue')
+)
 const ClassicSettingsPanel = defineAsyncComponent(
   () => import('../visualizer/classic/ClassicSettingsPanel.vue')
 )
@@ -327,6 +330,16 @@ async function applyShortcuts(clear = false) {
               preferences.visualizerTunings = {
                 ...preferences.visualizerTunings,
                 claddagh: $event,
+              }
+            "
+          />
+          <MonetSettingsPanel
+            v-else-if="preferences.layout === 'monet'"
+            :tuning="preferences.visualizerTunings?.monet"
+            @update:tuning="
+              preferences.visualizerTunings = {
+                ...preferences.visualizerTunings,
+                monet: $event,
               }
             "
           />

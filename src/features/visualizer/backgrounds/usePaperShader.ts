@@ -22,9 +22,26 @@ export function usePaperShader(
   const canvas = shallowRef<HTMLCanvasElement | null>(null)
   const lost = shallowRef(false)
   let latestUniforms: ShaderMountUniforms = {}
-  const sizingKeys = new Set(['u_fit', 'u_scale', 'u_rotation', 'u_originX', 'u_originY', 'u_offsetX', 'u_offsetY', 'u_worldWidth', 'u_worldHeight'])
-  function uniformsFor(settings: PaperShaderConfig, uniforms: ShaderMountUniforms) {
-    return Object.fromEntries(Object.entries(uniforms).filter(([key]) => sizingKeys.has(key) || settings.fragment.includes(key)))
+  const sizingKeys = new Set([
+    'u_fit',
+    'u_scale',
+    'u_rotation',
+    'u_originX',
+    'u_originY',
+    'u_offsetX',
+    'u_offsetY',
+    'u_worldWidth',
+    'u_worldHeight',
+  ])
+  function uniformsFor(
+    settings: PaperShaderConfig,
+    uniforms: ShaderMountUniforms
+  ) {
+    return Object.fromEntries(
+      Object.entries(uniforms).filter(
+        ([key]) => sizingKeys.has(key) || settings.fragment.includes(key)
+      )
+    )
   }
   function dispose() {
     mount?.dispose()
@@ -67,7 +84,9 @@ export function usePaperShader(
       }
       const uniforms = {
         ...settings.uniforms,
-        ...(settings.fragment.includes('u_noiseTexture') ? { u_noiseTexture: getShaderNoiseTexture() } : {}),
+        ...(settings.fragment.includes('u_noiseTexture')
+          ? { u_noiseTexture: getShaderNoiseTexture() }
+          : {}),
       }
       latestUniforms = uniforms
       if (!settings.imageUrl) {
