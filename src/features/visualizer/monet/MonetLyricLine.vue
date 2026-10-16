@@ -2,6 +2,7 @@
 import { computed, useTemplateRef, watch } from 'vue'
 import type { PositionedMonetLineEntry } from './monetRailLayout'
 import type { Theme } from '../../theme/model'
+import { resolveThemeTranslationFontStack } from '../../theme/fontStacks'
 import type { ReadableValue } from '../timeSource'
 import {
   buildMonetDisplayTokens,
@@ -18,6 +19,7 @@ import { hasMeasuredMonetTiming, monetSweepFrame } from './monetFrame'
 const props = defineProps<{
   entry: PositionedMonetLineEntry
   theme: Theme
+  subtitleTheme?: Theme
   fontPx: number
   fontStack: string
   fontWeight: number
@@ -181,6 +183,7 @@ defineExpose({ paint, position })
         :key="track.role"
         class="monet-subtitle"
         :style="{
+          fontFamily: resolveThemeTranslationFontStack(subtitleTheme ?? theme),
           fontSize: track.fontPx + 'px',
           height: track.heightPx + 'px',
           lineHeight: track.lineHeightPx + 'px',
@@ -210,6 +213,7 @@ defineExpose({ paint, position })
   border-radius: 8px;
 }
 .monet-line-button:disabled {
+  opacity: 1;
   cursor: default;
 }
 .monet-line-button:focus-visible {

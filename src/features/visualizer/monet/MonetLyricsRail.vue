@@ -112,7 +112,8 @@ function prepare(entries: typeof visibleEntries.value) {
       ),
       subtitleContentMode: props.hideTranslationSubtitle
         ? 'none'
-        : (props.subtitleContentMode ?? 'translation'),
+        : (props.subtitleContentMode ??
+          (props.showSubtitleTranslation === false ? 'none' : 'translation')),
     },
     glow.value,
     cache
@@ -246,6 +247,7 @@ onScopeDispose(() => {
     ref="host"
     class="monet-rail"
     :class="{ 'is-static': staticMode }"
+    tabindex="0"
     role="region"
     aria-label="印象歌词轨道"
     @wheel.prevent.stop="wheel"
@@ -274,6 +276,7 @@ onScopeDispose(() => {
         "
         :entry="entry"
         :theme="theme"
+        :subtitle-theme="subtitleTheme"
         :font-px="fontPx"
         :font-stack="fontStack"
         :font-weight="fontWeight"

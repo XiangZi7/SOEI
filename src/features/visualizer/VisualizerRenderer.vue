@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { VisualizerSharedProps } from './definition'
+import type { VisualizerBackgroundProps } from './backgrounds/definition'
 import { visualizerEntry } from './registry'
 import VisualizerShell from './VisualizerShell.vue'
 import VisualizerBackgroundRenderer from './backgrounds/VisualizerBackgroundRenderer.vue'
@@ -17,6 +18,19 @@ const props = defineProps<{
 const emit = defineEmits<{ back: [] }>()
 
 const entry = computed(() => visualizerEntry(props.mode))
+// Project only background inputs: never serialize the lyric array as fallthrough DOM attributes.
+const backgroundShared = computed<VisualizerBackgroundProps>(() => ({
+  theme: props.shared.theme,
+  isDaylight: props.shared.isDaylight,
+  coverUrl: props.shared.coverUrl,
+  audioPower: props.shared.audioPower,
+  audioBands: props.shared.audioBands,
+  seed: props.shared.seed,
+  staticMode: props.shared.backgroundStaticMode ?? props.shared.staticMode,
+  paused: props.shared.paused,
+  frameRate: props.shared.frameRate,
+  tunings: props.backgroundTunings,
+}))
 </script>
 
 <template>
@@ -34,11 +48,7 @@ const entry = computed(() => visualizerEntry(props.mode))
       >
         <VisualizerBackgroundRenderer
           :mode="backgroundMode"
-          :shared="{
-            ...shared,
-            tunings: backgroundTunings,
-            staticMode: shared.backgroundStaticMode ?? shared.staticMode,
-          }"
+          :shared="backgroundShared"
         />
       </slot>
     </template>

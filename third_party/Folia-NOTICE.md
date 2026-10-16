@@ -102,3 +102,12 @@ Adaptations:
 ## Scope
 
 No upstream media, React components or application infrastructure is included. Upstream source files carry `// @note Version Control: Project Folia version x.y.z` provenance watermarks; where ported code retains those lines they are kept deliberately as attribution.
+## Monet and registered backgrounds — 2026-10-16
+
+The Vue files under `src/features/visualizer/monet/` adapt Folia's VisualizerMonet, MonetLyricsRail, MonetPortraitImage, MonetFloatingDecor and AudioOverlay. The pure rail layout, portrait crossfade, audio sampling and particle builders retain the upstream algorithms; measured lyric/token helpers are reused from the previously ported `features/lyrics/folia/` modules. Vue watchers and typed callbacks replace React effects/state, and lyric scroll/sweep evaluation uses SOEI's playback clock. The original portrait drag editor and custom portrait upload are not included; position is exposed through settings. Animated singing glow uses drop-shadow instead of variable text-shadow.
+
+The modules under `src/features/visualizer/backgrounds/` adapt the upstream background definitions, registry, common Fluid/Geometric backgrounds, Sora GLSL, Monet bitmap pipeline, Latent audio/palette functions, Nomand shader configuration and overscan/inversion helpers, and the sandboxed URL layer. SOEI adds input validation, bounded caches, cancellation of obsolete cover decodes, explicit resource ownership, and frame-rate/visibility integration. Sora uses a native WebGL host instead of twgl. Existing `features/visual/coverDrift.ts` and `useCoverDrift.ts` supply the already-ported Monet WAAPI drift; this change adds pause handling rather than a second copy.
+
+Latent and Nomand use the published `@paper-design/shaders` 0.0.80 package directly, preserving the same shader family as upstream's React wrappers. Paper Shaders is a separate Apache-2.0 dependency, with its LICENSE/NOTICE shipped in its npm package. SOEI does not copy the Paper React wrappers. ShaderMount is held at speed zero and driven by the application frame loop; static image shaders only render on changes. The URL renderer preserves `sandbox="allow-scripts"`; desktop external-frame access remains disabled by the existing CSP.
+
+These Folia adaptations remain AGPL-3.0, as described above. Background and lyric scene registry entries are lazy-loaded; none of the still-unported Folia modes are registered as placeholders.

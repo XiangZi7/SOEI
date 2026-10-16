@@ -1,13 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import {
-  UiSelect,
-  UiSlider,
-  UiSwitch,
-  UiInput,
-  UiButton,
-} from '../../../components/ui'
+import { desktop } from '../../../bridge/native'
+import { UiSelect, UiSlider, UiSwitch, UiButton } from '../../../components/ui'
 import SettingRow from '../../settings/SettingRow.vue'
+import UrlBackgroundSettings from './url/UrlBackgroundSettings.vue'
 import {
   visualizerBackgroundEntries,
   visualizerBackgroundEntry,
@@ -129,12 +125,10 @@ const caption: Record<string, string> = {
           Number(tuning[control.key]).toFixed(2)
         }}</span>
       </template>
-      <UiInput
+      <UrlBackgroundSettings
         v-else
-        :model-value="String(tuning[control.key] ?? '')"
-        :label="control.label"
-        placeholder="https://"
-        @change="update(control.key, ($event.target as HTMLInputElement).value)"
+        :value="String(tuning[control.key] ?? '')"
+        @update:value="update(control.key, $event)"
       />
     </SettingRow>
     <p
@@ -145,7 +139,9 @@ const caption: Record<string, string> = {
       {{
         tuning.url && !sanitizeBackgroundUrl(tuning.url)
           ? '请输入有效的 HTTP 或 HTTPS 地址。'
-          : '部分网站不允许嵌入。暂停或省电时显示主题底色。'
+          : desktop
+            ? '桌面版当前只允许应用同源页面；外部网页尚未启用。暂停或省电时显示主题底色。'
+            : '部分网站不允许嵌入。暂停或省电时显示主题底色。'
       }}
     </p>
     <UiButton
